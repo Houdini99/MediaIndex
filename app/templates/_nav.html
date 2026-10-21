@@ -1,0 +1,40 @@
+<nav>
+  <a class="brand" href="{{ url_for('media.index') }}">
+    <span class="brand-mark">M</span>
+    <span class="brand-name">MediaIndex</span>
+  </a>
+  <div class="nav-sep"></div>
+  <div class="nav-links">
+    <a href="{{ url_for('media.index') }}"  class="{{ 'active' if request.path == '/' else '' }}">Gallery</a>
+    <a href="{{ url_for('media.feed') }}"   class="{{ 'active' if request.path.startswith('/feed') else '' }}">Feed</a>
+    <a href="{{ url_for('media.upload') }}" class="{{ 'active' if request.path.startswith('/upload') else '' }}">Upload</a>
+    <a href="{{ url_for('media.queue') }}"  class="{{ 'active' if request.path.startswith('/queue') else '' }}">Untagged{% if staging_count %} <span class="nav-badge">{{ staging_count }}</span>{% endif %}</a>
+    <a href="{{ url_for('media.tags') }}"   class="{{ 'active' if request.path.startswith('/tags') else '' }}">Tags</a>
+  </div>
+  <div class="nav-right">
+    {% if g.user %}
+      <div class="user-chip">
+        <div class="user-avatar">{{ g.user.username[0].upper() }}</div>
+        {{ g.user.username }}
+      </div>
+      <a class="nav-cog {{ 'active' if request.path.startswith('/settings') else '' }}"
+         href="{{ url_for('media.settings') }}" title="Settings" aria-label="Settings">
+        {# Cogwheel: eight teeth as one path, plus the hub. #}
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </a>
+      {% if g.user.is_admin %}
+        <a class="nav-admin {{ 'active' if request.path.startswith('/admin') else '' }}" href="{{ url_for('admin.panel') }}">Admin Panel</a>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="nav-logout" style="background:none;cursor:pointer;font-family:inherit;">Sign Out</button>
+      </form>
+    {% else %}
+      <a class="btn btn-primary" href="{{ url_for('auth.login') }}" style="font-size:.8rem;padding:.3rem .75rem;">Sign In</a>
+    {% endif %}
+  </div>
+</nav>

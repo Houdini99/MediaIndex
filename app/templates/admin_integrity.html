@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Integrity Check{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">Integrity Check</div>
+      <div class="page-sub">Database rows vs. files on disk — scanned just now</div>
+    </div>
+    {% include '_admin_tabs.html' %}
+  </div>
+
+  {% set all_clean = not report.missing_rows and not report.orphan_files and not report.orphan_thumbs %}
+  {% if all_clean %}
+  <div class="admin-section">
+    <div class="admin-section-title">✓ Everything is consistent</div>
+    <p class="admin-empty">Every database row has its file, and every file and thumbnail belongs to a row.</p>
+  </div>
+  {% endif %}
+
+  <!-- ── Rows with missing files ───────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Database rows with missing files <span class="count-badge {{ 'ok' if not report.missing_rows }}">{{ report.missing_rows|length }}</span></div>
+      {% if report.missing_rows %}
+      <form method="post" action="{{ url_for('admin.integrity_cleanup') }}" class="inline-form"
+            data-confirm="Delete {{ report.missing_rows|length }} database row(s) and their leftover thumbnails? The media files are already gone.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="target" value="missing_rows"/>
+        <button type="submit" class="btn btn-danger btn-sm">Remove these rows</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if report.missing_rows %}
+    <p class="admin-note">These media entries point to files that no longer exist on disk. Removing them deletes the database rows and any leftover thumbnails.</p>
+    <div class="tag-result-scroll">
+      <table class="admin-table">
+        <thead><tr><th>ID</th><th>Missing file</th></tr></thead>
+        <tbody>
+          {% for mid, fp, th in report.missing_rows[:200] %}
+          <tr><td>#{{ mid }}</td><td class="mono">{{ fp|basename }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if report.missing_rows|length > 200 %}<p class="admin-note">…and {{ report.missing_rows|length - 200 }} more.</p>{% endif %}
+    {% else %}
+    <p class="admin-empty">None — every row's file exists.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Orphaned media files ──────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Orphaned media files <span class="count-badge {{ 'ok' if not report.orphan_files }}">{{ report.orphan_files|length }}</span>
+        {% if report.orphan_files %}<span class="size-note">{{ orphan_files_size }}</span>{% endif %}
+      </div>
+      {% if report.orphan_files %}
+      <form method="post" action="{{ url_for('admin.integrity_cleanup') }}" class="inline-form"
+            data-confirm="Permanently delete {{ report.orphan_files|length }} file(s) ({{ orphan_files_size }}) from disk? This cannot be undone.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="target" value="orphan_files"/>
+        <button type="submit" class="btn btn-danger btn-sm">Delete these files</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if report.orphan_files %}
+    <p class="admin-note">Files in the media folder that no database row references. Deleting them frees disk space; they are not shown anywhere in the app.</p>
+    <div class="tag-result-scroll">
+      <table class="admin-table">
+        <thead><tr><th>File</th><th>Size</th></tr></thead>
+        <tbody>
+          {% for name, size in report.orphan_files[:200] %}
+          <tr><td class="mono">{{ name }}</td><td>{{ (size / 1048576)|round(2) }} MB</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if report.orphan_files|length > 200 %}<p class="admin-note">…and {{ report.orphan_files|length - 200 }} more.</p>{% endif %}
+    {% else %}
+    <p class="admin-empty">None — every file belongs to a row.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Orphaned thumbnails ───────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Orphaned thumbnails <span class="count-badge {{ 'ok' if not report.orphan_thumbs }}">{{ report.orphan_thumbs|length }}</span>
+        {% if report.orphan_thumbs %}<span class="size-note">{{ orphan_thumbs_size }}</span>{% endif %}
+      </div>
+      {% if report.orphan_thumbs %}
+      <form method="post" action="{{ url_for('admin.integrity_cleanup') }}" class="inline-form"
+            data-confirm="Permanently delete {{ report.orphan_thumbs|length }} thumbnail(s)?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="target" value="orphan_thumbs"/>
+        <button type="submit" class="btn btn-danger btn-sm">Delete these thumbnails</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if report.orphan_thumbs %}
+    <div class="tag-result-scroll">
+      <table class="admin-table">
+        <thead><tr><th>Thumbnail</th><th>Size</th></tr></thead>
+        <tbody>
+          {% for name, size in report.orphan_thumbs[:200] %}
+          <tr><td class="mono">{{ name }}</td><td>{{ (size / 1024)|round(1) }} KB</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if report.orphan_thumbs|length > 200 %}<p class="admin-note">…and {{ report.orphan_thumbs|length - 200 }} more.</p>{% endif %}
+    {% else %}
+    <p class="admin-empty">None — every thumbnail belongs to a row.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Placeholder thumbnails ────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Placeholder thumbnails <span class="count-badge {{ 'ok' if not report.placeholder_thumbs }}">{{ report.placeholder_thumbs|length }}</span></div>
+      {% if report.placeholder_thumbs %}
+      <form method="post" action="{{ url_for('admin.integrity_cleanup') }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="target" value="placeholder_thumbs"/>
+        <button type="submit" class="btn btn-primary btn-sm">Re-render</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if report.placeholder_thumbs %}
+    <p class="admin-note">Items still showing the blank placeholder instead of a real thumbnail — the thumbnail job was lost to a restart, or the file could not be decoded. Re-rendering is safe; a file that still cannot be decoded keeps its placeholder.</p>
+    <div class="tag-result-scroll">
+      <table class="admin-table">
+        <thead><tr><th>ID</th><th>File</th></tr></thead>
+        <tbody>
+          {% for mid, fp, th in report.placeholder_thumbs[:200] %}
+          <tr><td>#{{ mid }}</td><td class="mono">{{ fp|basename }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if report.placeholder_thumbs|length > 200 %}<p class="admin-note">…and {{ report.placeholder_thumbs|length - 200 }} more.</p>{% endif %}
+    {% else %}
+    <p class="admin-empty">None — every item has a real thumbnail.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

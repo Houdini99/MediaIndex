@@ -1,0 +1,7 @@
+<div class="admin-tabs">
+  <a href="{{ url_for('admin.panel') }}"      class="{{ 'active' if request.path.rstrip('/') == '/admin' else '' }}">Panel</a>
+  <a href="{{ url_for('admin.integrity') }}"  class="{{ 'active' if request.path.startswith('/admin/integrity') else '' }}">Integrity</a>
+  <a href="{{ url_for('admin.duplicates') }}" class="{{ 'active' if request.path.startswith('/admin/duplicates') else '' }}">Duplicates</a>
+  <a href="{{ url_for('admin.site_logins') }}" class="{{ 'active' if request.path.startswith('/admin/site-logins') else '' }}">Site logins</a>
+  <a href="{{ url_for('admin.logs') }}"       class="{{ 'active' if request.path.startswith('/admin/logs') else '' }}">Logs</a>
+</div>

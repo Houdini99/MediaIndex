@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Near Duplicates{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">Near Duplicates</div>
+      <div class="page-sub">Perceptual fingerprints across the public library — private media is never scanned</div>
+    </div>
+    {% include '_admin_tabs.html' %}
+  </div>
+
+  <!-- ── Overview ──────────────────────────────────────────────────────── -->
+  <div class="admin-stats-row">
+    <div class="stat-card">
+      <div class="stat-num" id="statIndexed">{{ status.coverage.hashed }}</div>
+      <div class="stat-label">Fingerprinted of {{ status.coverage.total }} public items</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statPending">{{ status.coverage.pending }}</div>
+      <div class="stat-label">Not yet fingerprinted{% if status.coverage.failed %} · {{ status.coverage.failed }} failed{% endif %}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statGroups">—</div>
+      <div class="stat-label">Duplicate groups</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statRedundant">—</div>
+      <div class="stat-label">Redundant copies</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="statWasted">—</div>
+      <div class="stat-label">Reclaimable</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ quarantine_count }}</div>
+      <div class="stat-label">Quarantined · {{ quarantine_size }}</div>
+    </div>
+  </div>
+
+  <!-- ── Build the fingerprint index ───────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Fingerprint index</div>
+      <div class="dupe-head-actions">
+        <span class="admin-note" style="margin:0">
+          {% if status.coverage.last_hashed_at %}Last updated {{ status.coverage.last_hashed_at }}{% else %}Never built{% endif %}
+        </span>
+      </div>
+    </div>
+    <p class="admin-note">
+      Images and GIFs are fingerprinted from their thumbnail or their original file;
+      videos are always sampled frame by frame from the source, so a re-encode is
+      recognised even when its poster frame differs. Re-running only covers what is
+      new — {{ scale.image }} images, {{ scale.gif }} GIFs and {{ scale.video }} videos are eligible.
+    </p>
+
+    <form method="post" action="{{ url_for('admin.duplicates_scan') }}" class="dupe-scan-form" id="scanForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="hidden" name="algo" value="{{ params.algo }}"/>
+      <input type="hidden" name="threshold" value="{{ params.threshold }}"/>
+      <input type="hidden" name="min_group" value="{{ params.min_group }}"/>
+      <input type="hidden" name="sort" value="{{ params.sort }}"/>
+
+      <label class="dupe-field">
+        <span class="dupe-field-label">Hash source</span>
+        <select name="source">
+          <option value="thumb" {{ 'selected' if params.source == 'thumb' }}>Thumbnails — fast</option>
+          <option value="file"  {{ 'selected' if params.source == 'file' }}>Original files — precise, slower</option>
+        </select>
+      </label>
+
+      <label class="dupe-field">
+        <span class="dupe-field-label">Frames per video</span>
+        <select name="video_frames">
+          {% for n in frame_choices %}
+          <option value="{{ n }}" {{ 'selected' if params.video_frames == n }}>{{ n }} frames</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <div class="dupe-field">
+        <span class="dupe-field-label">Media types</span>
+        <div class="dupe-checks">
+          {% for t in types %}
+          <label><input type="checkbox" name="types" value="{{ t }}" {{ 'checked' if t in params.types }}> {{ t }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <label class="dry-run-label"><input type="checkbox" name="rehash" value="1"> Rehash everything (discards the current index)</label>
+
+      <div class="dupe-scan-actions">
+        <button type="submit" class="btn btn-primary btn-sm" id="scanBtn">Build / update index</button>
+        <button type="button" class="btn btn-danger btn-sm" id="cancelBtn" hidden>Cancel scan</button>
+      </div>
+    </form>
+
+    <div class="dupe-progress" id="progress" hidden>
+      <div class="dupe-progress-bar"><div class="dupe-progress-fill" id="progressFill"></div></div>
+      <div class="dupe-progress-meta" id="progressMeta"></div>
+    </div>
+  </div>
+
+  <!-- ── Match settings ────────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Match settings</div>
+      <div class="dupe-head-actions">
+        <a class="btn btn-ghost btn-sm" id="exportBtn" href="{{ url_for('admin.duplicates_export') }}">Export CSV</a>
+        <button type="button" class="btn btn-danger btn-sm" id="resolveAllBtn">Resolve every group…</button>
+      </div>
+    </div>
+    <p class="admin-note">
+      Changing these re-groups the existing fingerprints instantly — no rescan needed.
+    </p>
+
+    <form method="get" action="{{ url_for('admin.duplicates') }}" class="dupe-match-form" id="matchForm">
+      <input type="hidden" name="source" value="{{ params.source }}"/>
+      <input type="hidden" name="video_frames" value="{{ params.video_frames }}"/>
+      <input type="hidden" name="types" value="{{ params.types|join(',') }}"/>
+
+      <label class="dupe-field">
+        <span class="dupe-field-label">Algorithm</span>
+        <select name="algo">
+          <option value="phash"  {{ 'selected' if params.algo == 'phash' }}>pHash — DCT, most robust</option>
+          <option value="dhash"  {{ 'selected' if params.algo == 'dhash' }}>dHash — gradient</option>
+          <option value="ahash"  {{ 'selected' if params.algo == 'ahash' }}>aHash — average</option>
+          <option value="strict" {{ 'selected' if params.algo == 'strict' }}>pHash + dHash — both must agree</option>
+        </select>
+      </label>
+
+      <label class="dupe-field dupe-field-wide">
+        <span class="dupe-field-label">Max distance <span class="dupe-threshold-note" id="thresholdNote">{{ params.threshold }} bits</span></span>
+        <input type="range" name="threshold" id="thresholdInput" min="0" max="{{ max_threshold }}" value="{{ params.threshold }}">
+      </label>
+
+      <label class="dupe-field">
+        <span class="dupe-field-label">Min group size</span>
+        <input type="number" name="min_group" min="2" max="50" value="{{ params.min_group }}">
+      </label>
+
+      <label class="dupe-field">
+        <span class="dupe-field-label">Sort groups by</span>
+        <select name="sort">
+          <option value="similarity" {{ 'selected' if params.sort == 'similarity' }}>Similarity</option>
+          <option value="wasted"     {{ 'selected' if params.sort == 'wasted' }}>Reclaimable size</option>
+          <option value="size"       {{ 'selected' if params.sort == 'size' }}>Group size</option>
+          <option value="newest"     {{ 'selected' if params.sort == 'newest' }}>Newest</option>
+        </select>
+      </label>
+
+      <label class="dry-run-label">
+        <input type="checkbox" name="cross_uploader_only" value="1" {{ 'checked' if params.cross_uploader_only }}>
+        Only groups spanning different uploaders
+      </label>
+      <label class="dry-run-label">
+        <input type="checkbox" id="mergeTags" checked>
+        Merge the losers' tags onto the keeper when resolving
+      </label>
+
+      <noscript><button type="submit" class="btn btn-primary btn-sm">Apply</button></noscript>
+    </form>
+  </div>
+
+  <!-- ── Results ───────────────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Groups <span class="count-badge" id="groupCount">—</span></div>
+      <div class="dupe-head-actions" id="pager" hidden>
+        <button type="button" class="btn btn-ghost btn-sm" id="prevPage">← Previous</button>
+        <span class="admin-note" id="pageLabel" style="margin:0"></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="nextPage">Next →</button>
+      </div>
+    </div>
+    <div id="groupsNote" class="admin-note" hidden></div>
+    <div id="groupsEmpty" class="admin-empty" hidden></div>
+    <div id="groups" class="dupe-groups"></div>
+  </div>
+
+  <!-- ── Quarantine (step two of the resolve) ──────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-head">
+      <div class="admin-section-title">Quarantine <span class="count-badge {{ 'ok' if not quarantine }}">{{ quarantine_count }}</span>
+        {% if quarantine %}<span class="size-note">{{ quarantine_size }}</span>{% endif %}
+      </div>
+      {% if quarantine %}
+      <div class="dupe-head-actions">
+        <form method="post" action="{{ url_for('admin.duplicates_quarantine_restore') }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input type="hidden" name="all" value="1"/>
+          <button type="submit" class="btn btn-ghost btn-sm">Restore all</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.duplicates_quarantine_purge') }}" class="inline-form"
+              data-confirm="Permanently delete all {{ quarantine_count }} quarantined item(s) ({{ quarantine_size }})? Files and thumbnails are removed from disk. This cannot be undone.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <input type="hidden" name="all" value="1"/>
+          <button type="submit" class="btn btn-danger btn-sm">Delete all permanently</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if quarantine %}
+    <p class="admin-note">
+      Resolved duplicates wait here, tagged <code class="mono">dupe</code> and
+      <code class="mono">dupe-of:&lt;id&gt;</code>. Nothing has been deleted yet — restoring
+      puts each item's original tags back exactly.
+    </p>
+    <form method="post" id="quarantineForm" action="{{ url_for('admin.duplicates_quarantine_purge') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div class="tag-result-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr><th></th><th>Preview</th><th>ID</th><th>Kept instead</th><th>Uploader</th><th>Size</th><th>Marked</th><th>Tags</th></tr>
+          </thead>
+          <tbody>
+            {% for mid, filepath, thumb, tags, owner, keeper_id, distance, marked_at, marker, bytes in quarantine %}
+            <tr>
+              <td><input type="checkbox" name="media_id" value="{{ mid }}"></td>
+              <td>
+                {% if thumb %}
+                <img class="dupe-mini" loading="lazy" src="{{ url_for('media.serve_thumb', fname=thumb|basename) }}" alt="">
+                {% else %}—{% endif %}
+              </td>
+              <td>#{{ mid }}</td>
+              <td>{% if keeper_id %}#{{ keeper_id }}{% else %}—{% endif %}</td>
+              <td>{{ owner or 'Unknown' }}</td>
+              <td>{{ (bytes / 1048576)|round(2) if bytes else '—' }} MB</td>
+              <td class="mono">{{ marked_at }}{% if marker %} · {{ marker }}{% endif %}</td>
+              <td class="mono">{{ tags or '(none)' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="dupe-scan-actions">
+        <button type="submit" class="btn btn-danger btn-sm"
+                data-confirm="Permanently delete the selected item(s)? This cannot be undone.">
+          Delete selected permanently
+        </button>
+        <button type="submit" class="btn btn-ghost btn-sm"
+                formaction="{{ url_for('admin.duplicates_quarantine_restore') }}">
+          Restore selected
+        </button>
+      </div>
+    </form>
+    {% else %}
+    <p class="admin-empty">Nothing quarantined. Resolving a group moves its duplicates here first — they are only deleted when you say so.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Dismissed pairs ───────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-title">Dismissed pairs <span class="count-badge {{ 'ok' if not dismissed }}">{{ dismissed|length }}</span></div>
+    {% if dismissed %}
+    <p class="admin-note">Pairs marked "not duplicates". They are excluded from every future grouping until restored.</p>
+    <form method="post" action="{{ url_for('admin.duplicates_undismiss') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <div class="tag-result-scroll">
+        <table class="admin-table">
+          <thead><tr><th></th><th>Pair</th><th>Files</th><th>Dismissed</th></tr></thead>
+          <tbody>
+            {% for a_id, b_id, a_file, b_file, when, who in dismissed %}
+            <tr>
+              <td><input type="checkbox" name="pair" value="{{ a_id }}:{{ b_id }}"></td>
+              <td>#{{ a_id }} ↔ #{{ b_id }}</td>
+              <td class="mono">{{ a_file|basename if a_file else '(deleted)' }} · {{ b_file|basename if b_file else '(deleted)' }}</td>
+              <td class="mono">{{ when }}{% if who %} · {{ who }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="dupe-scan-actions">
+        <button type="submit" class="btn btn-ghost btn-sm">Restore selected pairs</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="admin-empty">None — no pair has been marked "not duplicates".</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Fingerprint failures ──────────────────────────────────────────── -->
+  {% if errors %}
+  <div class="admin-section">
+    <div class="admin-section-title">Could not be fingerprinted <span class="count-badge">{{ errors|length }}</span></div>
+    <p class="admin-note">These are skipped by every scan until the file is replaced or the index is rebuilt with "rehash everything".</p>
+    <div class="tag-result-scroll">
+      <table class="admin-table">
+        <thead><tr><th>ID</th><th>File</th><th>Type</th><th>Error</th></tr></thead>
+        <tbody>
+          {% for mid, filepath, ftype, error, when in errors %}
+          <tr>
+            <td>#{{ mid }}</td>
+            <td class="mono">{{ filepath|basename }}</td>
+            <td>{{ ftype or '—' }}</td>
+            <td class="mono">{{ error }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin-duplicates.js') }}"></script>{% endblock %}

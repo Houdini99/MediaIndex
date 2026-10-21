@@ -1,0 +1,35 @@
+{% extends "auth/auth_base.html" %}
+{% block title %}MediaIndex — Sign In{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+    <a class="auth-brand" href="#">
+      <span class="auth-brand-mark">M</span>
+      <span class="auth-brand-name">MediaIndex</span>
+    </a>
+    <div class="auth-card">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-subtitle">Sign in with your account</div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="flash flash-{{cat}}">{{msg}}</div>
+        {% endfor %}
+      {% endwith %}
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" placeholder="Enter username" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" placeholder="Enter password" required autocomplete="current-password">
+        </div>
+        <button class="submit-btn" type="submit">Sign In</button>
+      </form>
+      <div class="auth-divider"></div>
+      <div class="auth-footer">
+        Don't have an account? <a href="{{ url_for('auth.register') }}">Register</a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Site Logins{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">Site Logins</div>
+      <div class="page-sub">The accounts the Discord and Telegram bots download links with</div>
+    </div>
+    {% include '_admin_tabs.html' %}
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-section-title">How this works</div>
+    <p class="admin-note">
+      A link the bots hand to yt-dlp is downloaded with the login stored for its site here — or with
+      <em>Other sites</em> when its site has no entry of its own. Upload a <span class="mono">cookies.txt</span>
+      (Netscape format) exported with a browser extension such as “Get cookies.txt LOCALLY” while logged in.
+      Export it from a private window and close that window afterwards: a browser that keeps using the
+      session rotates the cookies and ends the copy you uploaded.
+    </p>
+    <p class="admin-note">
+      Only the site's own cookies are kept, and they are stored encrypted. After a download that worked,
+      the bots save whatever the site rotated, so a login stays fresh while it is in use. When a link fails
+      with “login required” or “confirm you're not a bot”, upload a fresh export here.
+    </p>
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-section-title">Sites</div>
+    <table class="admin-table">
+      <thead>
+        <tr><th>Site</th><th>Status</th><th>Uploaded</th><th>Kept fresh</th><th class="col-actions">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set plat = row.platform %}
+        <tr>
+          <td>
+            <strong>{{ plat.name }}</strong>
+            {% if plat.domains %}<div class="admin-note login-domains mono">{{ plat.domains|join(', ') }}</div>{% endif %}
+            <div class="admin-note login-hint">{{ plat.hint }}</div>
+          </td>
+          <td>
+            {% if not row.login %}
+              <span class="role-badge">not set</span>
+            {% elif not row.login.readable %}
+              <span class="login-badge login-bad">unreadable</span>
+              <div class="admin-note login-hint">SECRET_KEY changed since it was saved — upload it again.</div>
+            {% elif row.info.expired %}
+              <span class="login-badge login-bad">expired</span>
+              <div class="admin-note login-hint">Expired {{ row.expires }}.</div>
+            {% elif row.info.logged_in %}
+              <span class="login-badge login-ok">logged in</span>
+              <div class="admin-note login-hint">{{ row.info.count }} cookie(s){% if row.expires %}, login runs until {{ row.expires }}{% endif %}</div>
+            {% elif plat.login_cookies %}
+              <span class="login-badge login-warn">no login cookie</span>
+              <div class="admin-note login-hint">{{ row.info.count }} cookie(s), but none of {{ plat.login_cookies|join(', ') }}.</div>
+            {% else %}
+              <span class="login-badge login-ok">set</span>
+              <div class="admin-note login-hint">{{ row.info.count }} cookie(s)</div>
+            {% endif %}
+          </td>
+          <td>{% if row.login %}{{ row.uploaded_at }}{% if row.login.uploaded_by %}<div class="admin-note login-hint">by {{ row.login.uploaded_by }}</div>{% endif %}{% else %}—{% endif %}</td>
+          <td>{{ row.rotated_at or '—' }}</td>
+          <td class="col-actions">
+            <div class="login-actions">
+            <form method="post" action="{{ url_for('admin.site_login_upload', platform_id=plat.id) }}"
+                  enctype="multipart/form-data" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="file" name="cookies" accept=".txt,text/plain" required class="login-file"/>
+              <button type="submit" class="btn btn-primary btn-sm">{{ 'Replace' if row.login else 'Upload' }}</button>
+            </form>
+            {% if row.login %}
+            <form method="post" action="{{ url_for('admin.site_login_remove', platform_id=plat.id) }}" class="inline-form"
+                  data-confirm="Remove the stored {{ plat.name }} login? The bots will download {{ plat.name }} links logged out.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+            </form>
+            {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="admin-note login-footnote">Files up to {{ max_kb }} KB. The bots fetch a login only for the link that needs it, over their app password, and only accounts listed in DELEGATED_UPLOADERS may.</p>
+  </div>
+</div>
+{% endblock %}

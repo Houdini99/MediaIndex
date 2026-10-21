@@ -1,0 +1,37 @@
+# Ignore the massive media folder
+media_files/
+thumbnails/
+# Never bake secrets or databases into the image — nor send them to the
+# daemon: every image builds from the repo root, so anything not listed here
+# is uploaded as build context even when no Dockerfile copies it.
+.env
+*.pem
+*.db
+log/
+# pg_dump output and encrypted archives: user AES keys, password hashes
+backups/
+*.gpg
+# Users' WebDAV inboxes
+staging/
+docs/
+docker-compose.yml
+# Internal notes, not part of any image
+cleanup.md
+recommendations.md
+# Version control + tests (not needed in the image, bloat the build context)
+.git/
+tests/
+# Python build artefacts. `**/` because a bare pattern only matches at the
+# context root — without it, app/__pycache__ and friends would be copied
+# into the images.
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+preview.png
+.claude/
+# Runtime state (the staging-scanner lock), bind-mounted at runtime
+data/

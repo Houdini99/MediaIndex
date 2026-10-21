@@ -1,0 +1,18 @@
+# python-telegram-bot v21+ is async and supports a local Bot API server
+# through ApplicationBuilder().base_url(...).local_mode(True), which is
+# what lifts the 20 MB download ceiling (see config.API_BASE).
+python-telegram-bot==21.9
+# The index client and the direct-link downloader speak aiohttp, matching
+# discord_bot/index_client.py and discord_bot/download.py.
+aiohttp==3.11.11
+redis==5.2.1
+# yt-dlp is NOT pinned here on purpose, and is not even installed by this
+# file: sites break old extractors constantly, and pip's layer is cached
+# on this file's contents, so a line here would freeze the resolver at
+# whatever version the image was first built with. The Dockerfile installs
+# and upgrades it behind a YTDLP_REFRESH build arg instead — see the
+# comment there. yt-dlp-ejs bundles the YouTube JS-challenge solver
+# scripts (run through deno); the curl-cffi extra enables Chrome
+# impersonation for sites that 403 non-browser clients; and
+# bgutil-ytdlp-pot-provider fetches YouTube PO tokens from the `bgutil`
+# sidecar.

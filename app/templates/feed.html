@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Feed{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/feed.css') }}">{% endblock %}
+{% block content %}
+<div class="feed-toolbar">
+  <div class="feed-volume" id="feedVolume">
+    <button class="feed-tool-btn" id="feedVolumeBtn" type="button" title="Toggle mute (m)" aria-label="Toggle mute">
+      <svg class="feed-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path data-vol-wave="2" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        <path data-vol-wave="3" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        <g data-vol-mute hidden>
+          <line x1="22" y1="9" x2="16" y2="15"></line>
+          <line x1="16" y1="9" x2="22" y2="15"></line>
+        </g>
+      </svg>
+    </button>
+    <input type="range" id="feedVolumeSlider" class="feed-volume-slider" min="0" max="100" value="100" step="1" aria-label="Volume">
+  </div>
+  <button class="feed-tool-btn" id="feedSlideshowBtn" type="button" title="Start slideshow (s)" aria-label="Toggle slideshow" aria-pressed="false">
+    <svg class="feed-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polygon data-ss-play points="6 4 20 12 6 20 6 4"></polygon>
+      <g data-ss-pause hidden>
+        <line x1="8" y1="5" x2="8" y2="19"></line>
+        <line x1="16" y1="5" x2="16" y2="19"></line>
+      </g>
+    </svg>
+  </button>
+  <button class="feed-tool-btn" id="feedFullscreenBtn" type="button" title="Fullscreen (f)" aria-label="Toggle fullscreen" aria-pressed="false">
+    <svg class="feed-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path data-fs-expand d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+      <path data-fs-collapse hidden d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+    </svg>
+  </button>
+  <button class="feed-tool-btn" id="feedSettingsBtn" type="button" title="Feed settings" aria-label="Feed settings" aria-expanded="false" aria-controls="feedSettingsPanel">
+    <svg class="feed-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+</div>
+
+<div class="feed-settings-panel" id="feedSettingsPanel" hidden role="dialog" aria-label="Feed settings">
+  <div class="feed-settings-header">
+    <span>Feed Settings</span>
+    <button type="button" class="feed-settings-close" id="feedSettingsClose" aria-label="Close settings">×</button>
+  </div>
+  <div class="feed-settings-section">
+    <span class="feed-settings-label">Show types</span>
+    <div class="feed-type-toggles">
+      <label class="feed-toggle-chip">
+        <input type="checkbox" data-type-toggle="image" checked>
+        <span>Images</span>
+      </label>
+      <label class="feed-toggle-chip">
+        <input type="checkbox" data-type-toggle="gif" checked>
+        <span>GIFs</span>
+      </label>
+      <label class="feed-toggle-chip">
+        <input type="checkbox" data-type-toggle="video" checked>
+        <span>Videos</span>
+      </label>
+    </div>
+  </div>
+  <div class="feed-settings-section">
+    <label class="feed-settings-label" for="feedIncludeTags">Include tags <span class="feed-settings-hint">comma separated, all must match</span></label>
+    <input type="text" id="feedIncludeTags" class="feed-settings-input" placeholder="e.g. cats, sunset" autocomplete="off" spellcheck="false" data-tag-ac>
+  </div>
+  <div class="feed-settings-section">
+    <label class="feed-settings-label" for="feedExcludeTags">Exclude tags <span class="feed-settings-hint">comma separated</span></label>
+    <input type="text" id="feedExcludeTags" class="feed-settings-input" placeholder="e.g. ai, fake" autocomplete="off" spellcheck="false" data-tag-ac>
+  </div>
+  <div class="feed-settings-section">
+    <label class="feed-toggle-chip">
+      <input type="checkbox" id="feedHideAi">
+      <span>Hide AI</span>
+    </label>
+    <span class="feed-settings-hint">Also hides: {{ ai_tags|join(', ') }}</span>
+  </div>
+  <div class="feed-settings-section">
+    <span class="feed-settings-label">Slideshow <span class="feed-settings-hint">auto-advance</span></span>
+    <div class="feed-slideshow-row">
+      <label class="feed-toggle-chip">
+        <input type="checkbox" id="feedSlideshowToggle">
+        <span>Enable</span>
+      </label>
+      <div class="feed-slideshow-timer">
+        <input type="number" id="feedSlideshowTimer" class="feed-settings-input" min="1" max="120" step="1" value="5" aria-label="Slideshow timer in seconds">
+        <span class="feed-settings-hint">sec / photo</span>
+      </div>
+    </div>
+    <span class="feed-settings-hint">Videos advance when they finish playing.</span>
+  </div>
+  <div class="feed-settings-actions">
+    <button type="button" class="feed-settings-action is-primary" id="feedSettingsApply">Apply</button>
+    <button type="button" class="feed-settings-action" id="feedSettingsReset">Reset filters</button>
+  </div>
+</div>
+
+<div class="feed-container" id="feedContainer">
+  <div class="feed-loader-slide" id="initialLoader">
+    <div class="feed-loader"></div>
+    <div>Loading feed…</div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tag-autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/feed.js') }}"></script>
+{% endblock %}

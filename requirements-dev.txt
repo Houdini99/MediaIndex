@@ -1,0 +1,6 @@
+# Local tooling for the .venv: the test suite and the linter. Not installed
+# in any image.
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==9.1.1
+ruff==0.16.8

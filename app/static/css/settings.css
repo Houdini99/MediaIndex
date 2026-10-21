@@ -1,0 +1,99 @@
+/* ── USER SETTINGS PAGE ──────────────────────────────────────────────── */
+    .page-header { margin-bottom: 1.75rem; }
+    .page-title  {
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -.03em;
+        color: var(--text);
+        margin-bottom: .25rem;
+    }
+    .page-sub { font-size: .85rem; color: var(--muted); }
+
+    /* One column of cards, capped so a card of key/value rows does not
+       stretch to the full 1480px container. */
+    .settings-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        max-width: 560px;
+    }
+
+    .info-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.25rem 1.35rem;
+    }
+    .info-card-title {
+        font-size: .78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: var(--muted);
+        margin-bottom: .9rem;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: .75rem;
+        padding: .5rem 0;
+        border-bottom: 1px solid var(--border);
+        font-size: .82rem;
+    }
+    .info-row:last-of-type { border-bottom: none; }
+    .info-key { color: var(--muted); flex-shrink: 0; }
+    .info-val { color: var(--text2); text-align: right; word-break: break-all; }
+
+    .settings-hint {
+        margin-top: .9rem;
+        font-size: .74rem;
+        line-height: 1.5;
+        color: var(--muted);
+    }
+
+    .link-form { margin-top: .9rem; }
+    .link-label {
+        display: block;
+        font-size: .72rem;
+        color: var(--muted);
+        margin-bottom: .35rem;
+    }
+    .link-input {
+        width: 100%;
+        padding: .5rem .6rem;
+        font-size: .82rem;
+        color: var(--text);
+        background: var(--surf2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+    }
+    .link-input:focus {
+        outline: none;
+        border-color: var(--border-hi);
+    }
+    .password-form .link-input + .link-label { margin-top: .7rem; }
+    .link-actions { display: flex; gap: .6rem; margin-top: .7rem; }
+    /* .btn's display: inline-flex outranks the UA rule for [hidden], so
+       without this the Unlink button showed on a card with nothing linked. */
+    .link-actions .btn[hidden] { display: none; }
+
+    /* The Discord link code, shown after "Get link code". */
+    .dc-code { margin-bottom: .9rem; }
+    .dc-code[hidden] { display: none; }
+    .dc-code-row {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+    }
+    .dc-code-row code {
+        flex: 1;
+        padding: .5rem .6rem;
+        font-size: .95rem;
+        letter-spacing: .04em;
+        color: var(--text);
+        background: var(--surf2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        user-select: all;
+    }

@@ -1,0 +1,55 @@
+# Secrets
+.env
+.env.*
+!.env.example
+# The live stack file: real host paths, real domain, real Discord IDs.
+# docker-compose.yml.example is the tracked, generic one — keep the two in
+# step when a service or variable changes.
+docker-compose.yml
+# Local deployment tweaks (docker compose merges this automatically)
+docker-compose.override.yml
+# Private keys must NEVER reach a public repo
+*.pem
+*.key
+# yt-dlp cookie files: logged-in sessions for the sites they belong to
+cookies*.txt
+
+# Data — never in the repo
+media_files/
+thumbnails/
+log/
+data/
+# WebDAV inbox: users' staged uploads (staging/<user_id>/)
+staging/
+*.db
+*.db-wal
+*.db-shm
+# Backups and dumps: user AES keys, password hashes
+backups/
+*.gpg
+*.sql
+*.sql.gz
+*.dump
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Internal dev notes — kept local, not part of the public repo
+findings.md
+recommendations.md
+cleanup.md
+
+# AI agent settings, instructions and memory: local only, never in the repo
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.cursor/
+.aider*

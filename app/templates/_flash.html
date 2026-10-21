@@ -1,0 +1,14 @@
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flashes">
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{cat}}">
+          <div class="flash-icon">
+            {% if cat == 'success' %}✓{% elif cat == 'danger' %}✕{% else %}!{% endif %}
+          </div>
+          <span>{{msg}}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

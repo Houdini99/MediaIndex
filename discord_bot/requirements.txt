@@ -1,0 +1,14 @@
+discord.py==2.7.1
+redis==5.2.1
+# Floor, not an exact pin: sites break old extractors constantly, so the
+# newest yt-dlp is always wanted. This line alone does NOT deliver that —
+# pip's layer is cached on this file's contents — so the Dockerfile
+# re-upgrades yt-dlp behind a YTDLP_REFRESH build arg; see the comment
+# there. yt-dlp-ejs bundles the YouTube JS-challenge solver scripts (run
+# through deno, see Dockerfile); the curl-cffi extra enables Chrome
+# impersonation for sites that 403 non-browser clients;
+# bgutil-ytdlp-pot-provider fetches YouTube PO tokens from the `bgutil`
+# sidecar, and is pinned to match that sidecar's image.
+yt-dlp[curl-cffi]>=2026.7.4
+yt-dlp-ejs
+bgutil-ytdlp-pot-provider==2.0.2

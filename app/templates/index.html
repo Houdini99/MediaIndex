@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Gallery{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">{% endblock %}
+{% block content %}
+
+<div class="container">
+  {% include '_flash.html' %}
+  <form class="toolbar" action="{{ url_for('media.index') }}" method="get" autocomplete="off">
+    <div class="search-group">
+      <div class="input-wrap">
+        <span class="input-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3"/>
+          </svg>
+        </span>
+        <input name="search" type="text" placeholder="Search tags…" value="{{ search|e }}" data-tag-ac>
+      </div>
+      <div class="input-wrap">
+        <span class="input-icon">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 4L4 12M4 4l8 8"/>
+          </svg>
+        </span>
+        <input name="exclude_tags" type="text" placeholder="Exclude tags…" value="{{ exclude_tags|e }}" data-tag-ac>
+      </div>
+    </div>
+    <select name="type">
+      <option value="all"   {% if filter_type=='all'   %}selected{% endif %}>All types</option>
+      <option value="image"  {% if filter_type=='image'  %}selected{% endif %}>Images</option>
+      <option value="video" {% if filter_type=='video' %}selected{% endif %}>Videos</option>
+      <option value="gif"   {% if filter_type=='gif'   %}selected{% endif %}>GIFs</option>
+    </select>
+    <select name="sort" data-autosubmit>
+      <option value="newest" {% if sort=='newest' %}selected{% endif %}>Newest first</option>
+      <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>Oldest first</option>
+      <option value="random" {% if sort=='random' %}selected{% endif %}>Random</option>
+    </select>
+    <label class="ai-toggle" title="Hide content with the following tags: fake, ai, grok, gemini, chatgpt">
+      <input type="checkbox" name="hide_ai" value="1" {% if hide_ai == '1' %}checked{% endif %} data-autosubmit>
+      <span class="ai-toggle-track"></span>
+      <span>Hide AI content</span>
+    </label>
+    <label class="ai-toggle private-toggle" title="Show only files you uploaded as private">
+      <input type="checkbox" name="private_only" value="1" {% if private_only %}checked{% endif %} data-autosubmit>
+      <span class="ai-toggle-track"></span>
+      <span>Private only</span>
+    </label>
+    <div class="toolbar-actions">
+      <button class="btn btn-primary" type="submit">Search</button>
+      <a class="btn btn-ghost" href="{{ url_for('media.index') }}">Reset</a>
+      <button class="btn btn-ghost" type="button" id="select-toggle" data-action="select-mode" title="Select multiple files">☑ Select</button>
+    </div>
+  </form>
+
+  <!-- ── BULK ACTION BAR ── -->
+  <div id="bulk-bar" class="bulk-bar">
+    <span id="bulk-count" class="bulk-count">0 selected</span>
+    <div class="bulk-actions">
+      <button class="btn btn-ghost" type="button" data-action="bulk-all">Select all</button>
+      <button class="btn btn-ghost" type="button" data-action="bulk-clear">Clear</button>
+      <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-tags" data-mode="add" disabled>＋ Add tags</button>
+      <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-tags" data-mode="remove" disabled>− Remove tags</button>
+      <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-privacy" data-private="1" title="Encrypt the selection — only you can see private files" disabled>🔒 Make private</button>
+      <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-privacy" data-private="0" title="Decrypt the selection — public files are visible to every user" disabled>🔓 Make public</button>
+      <button class="btn bulk-delete-btn bulk-needs-sel" type="button" id="bulk-delete" data-action="bulk-delete" disabled>🗑 Delete selected</button>
+      <button class="btn btn-ghost" type="button" data-action="select-mode">Cancel</button>
+    </div>
+    <div id="bulk-tag-editor" class="bulk-tag-editor">
+      <div class="bulk-tag-wrap">
+        <input id="bulk-tag-input" type="text" placeholder="Tags, comma separated…" data-tag-ac>
+      </div>
+      <button class="btn btn-primary" type="button" id="bulk-tag-apply" data-action="bulk-tag-apply">Apply</button>
+      <button class="btn btn-ghost" type="button" data-action="bulk-tag-close">✕</button>
+    </div>
+  </div>
+
+  <div class="gallery">
+    {% for media in media %}
+      {%- set raw = media.filepath -%}
+      {%- set base = raw[:-4] if raw.endswith('.enc') else raw -%}
+      {%- set ext = base.rsplit('.',1)[-1].lower() -%}
+      {%- set mtype = 'video' if ext in ['mp4','webm','avi','mov','mkv'] else ('gif' if ext == 'gif' else 'image') -%}
+      <div class="gallery-item" data-id="{{ media.id }}">
+        <div class="action-buttons">
+          <button class="action-btn edit-btn"   data-action="edit" data-id="{{ media.id }}" data-stop title="Edit tags">✎</button>
+          <button class="action-btn delete-btn" data-action="delete" data-id="{{ media.id }}" data-stop  title="Delete File">×</button>
+        </div>
+        <div class="thumb-wrapper">
+          <img class="thumb" loading="lazy" data-action="open" data-id="{{ media.id }}"
+               data-src="/thumbs/{{ media.thumb.split('/')[-1] }}"
+               src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+               alt=""/>
+          <div class="thumb-overlay"></div>
+          <span class="type-badge {{ mtype }}">{{ mtype }}</span>
+          {% if media.is_private %}
+            <span class="type-badge private" title="Only visible to you">private</span>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <div class="card-tags">
+            {% if media.tags %}
+              {% for tag in media.tags.split(',') %}{% if tag.strip() %}
+                <span class="tag-pill {% if tag.strip().startswith('user:') %}user-tag{% elif tag.strip() in ['image','gif','video'] %}type-tag{% endif %}">{{ tag.strip() }}</span>
+              {% endif %}{% endfor %}
+            {% else %}
+              <span class="no-tags">No Tags</span>
+            {% endif %}
+          </div>
+        </div>
+        <div id="edit-form-{{ media.id }}" class="edit-form">
+          <input type="text" id="edit-input-{{ media.id }}" value="{{ media.tags or '' }}" placeholder="Tags separated by commas…" data-tag-ac>
+          <div class="edit-form-btns">
+            <button type="button" class="cancel-btn" data-action="edit-cancel" data-id="{{ media.id }}">Cancel</button>
+            <button type="button" class="save-btn"   data-action="edit-save" data-id="{{ media.id }}">Save</button>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+
+    {% if not media %}
+      <div class="empty">
+        <div class="empty-icon">&#128193;</div>
+        <h3>No entries found</h3>
+        <p>Try different search terms or reset the filter.</p>
+      </div>
+    {% endif %}
+
+    <div id="scroll-sentinel"></div>
+  </div>
+</div>
+
+<!-- ── MODAL ── -->
+<div id="modal-bg" class="modal-bg">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Preview</span>
+      <div class="modal-header-actions">
+        <button id="modal-slideshow" class="modal-btn" data-action="slideshow" title="Slideshow — advances every 5 s (videos play to the end)">▶ Slideshow</button>
+        <a id="modal-download" href="#" download class="modal-btn">↓ Download</a>
+        <button class="modal-btn modal-delete-btn" data-action="modal-delete" title="Delete file" style="color:var(--danger);border-color:rgba(248,81,73,.25);">🗑 Delete</button>
+        <button class="modal-close" data-action="modal-close" title="Close">×</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <button class="modal-nav modal-nav-prev" data-action="modal-prev" title="Previous (←)">‹</button>
+      <div class="modal-view-content"></div>
+      <button class="modal-nav modal-nav-next" data-action="modal-next" title="Next (→)">›</button>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-tags"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tag-autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
+{% endblock %}

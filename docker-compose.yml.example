@@ -1,0 +1,436 @@
+services:
+  web:
+    image: index-app:latest
+    container_name: mediaindex-web
+    restart: unless-stopped
+    # Capability hardening: drop everything the app does not need, and block
+    # setuid escalation. ffmpeg here decodes video that came from outside.
+    #
+    # Keep DAC_OVERRIDE only if the container's uid does not own the bind
+    # mounts — root is then judged as "other" and cannot write without it.
+    # If you chown the mounts to the container's uid, drop this cap_add too.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE
+    # Loopback-bound on purpose: the reverse proxy reaches this container by
+    # service name over the `proxy` network, so publishing on 0.0.0.0 only
+    # exposes the app outside the proxy — where the client controls
+    # X-Forwarded-For and can spoof or poison the IP ban.
+    ports:
+      - "127.0.0.1:${PORT:-5001}:5001"
+    networks:
+      - proxy
+      - backend
+    volumes:
+      # Host paths default to the repo root (.) for local `docker compose`.
+      # For Portainer, set INDEX_ROOT to the absolute path of your checkout
+      # on the host (Portainer resolves relative paths against its own dir).
+      - ${INDEX_ROOT:-.}/media_files:/app/media_files
+      - ${INDEX_ROOT:-.}/thumbnails:/app/thumbnails
+      - ${INDEX_ROOT:-.}/log:/app/log
+      # Cross-worker runtime files (staging_scanner.lock).
+      - ${INDEX_ROOT:-.}/data:/app/data
+      # WebDAV inbox: per-user staging folders (staging/<user_id>/).
+      - ${INDEX_ROOT:-.}/staging:/app/staging
+    environment:
+      - FLASK_APP=run.py
+      # Set SECRET_KEY as a stack environment variable in Portainer
+      # (or in ./.env for local `docker compose`, which substitutes it).
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required — set it in the stack environment}
+      # Built from REDIS_PASSWORD so the secret has one source. Keep it
+      # URL-safe (alphanumeric): a literal '@', ':' or '/' breaks urlsplit()
+      # in app/dav/__init__.py:_lock_storage().
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?set it in the stack environment}@redis:6379
+      - DEV_MODE=${DEV_MODE:-false}
+      - BAN_DURATION_HOURS=${BAN_DURATION_HOURS:-24}
+      # Days a login survives without a visit (rolling). Also the hard cap
+      # on how long a captured session cookie stays valid.
+      - SESSION_DAYS=${SESSION_DAYS:-30}
+      # 'true' opens /register, for creating the first account only.
+      - REGISTRATION_OPEN=${REGISTRATION_OPEN:-false}
+      # Tags the "Hide AI" filter hides; empty keeps the built-in list.
+      - AI_TAGS=${AI_TAGS:-}
+      # Peers whose X-Forwarded-For is believed (app/proxy.py). Empty =
+      # every private range, which trusts every container on the shared
+      # `proxy` network, not just the reverse proxy — any of them could
+      # reach web:5001 directly, forge the header, and ban an arbitrary IP
+      # or dodge the login rate limit. Set it to the proxy's fixed address
+      # on `proxy`.
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-}
+      - DAV_ENABLED=${DAV_ENABLED:-true}
+      - STAGING_SCAN_INTERVAL=${STAGING_SCAN_INTERVAL:-5}
+      - STAGING_STABLE_AGE=${STAGING_STABLE_AGE:-10}
+      # Seconds one video may take in the near-duplicate scan / in thumbnail
+      # rendering before its decoder is killed.
+      - DUPE_ITEM_TIMEOUT=${DUPE_ITEM_TIMEOUT:-180}
+      - VIDEO_THUMB_TIMEOUT=${VIDEO_THUMB_TIMEOUT:-180}
+      # Required — the app stores everything in PostgreSQL.
+      # Must match the postgres service's user/password/db below.
+      - DATABASE_URL=${DATABASE_URL:?set it in the stack environment}
+      # Display only: the @handle shown on /settings so a user knows which
+      # bot to message. The bot's own token decides what it really is.
+      - TELEGRAM_BOT_NAME=${TELEGRAM_BOT_NAME:-}
+      # Accounts allowed to attribute an upload to another user, and the
+      # only ones /api/telegram/user answers. Both bots need their index
+      # account listed here.
+      - DELEGATED_UPLOADERS=${DELEGATED_UPLOADERS:-Bot}
+    depends_on:
+      redis:
+        condition: service_started
+      # The app genuinely cannot run without Postgres, so gate the start on
+      # health rather than on the container merely existing.
+      postgres:
+        condition: service_healthy
+  redis:
+    image: redis:7-alpine
+    container_name: mediaindex-redis
+    restart: unless-stopped
+    # Authenticated and kept off the shared `proxy` network: redis holds the
+    # rate-limit counters, the Discord event queue, and the WsgiDAV lock
+    # storage — readable and writable by anything that can reach it.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set it in the stack environment}"]
+    networks:
+      - backend
+    volumes:
+      - redis_data:/data
+  postgres:
+    # Pinned major version. Minor-version pulls are safe; a major bump
+    # (17→18) needs its own dump/restore migration and must never happen
+    # via a casual redeploy — the new server refuses an old data directory.
+    image: postgres:17-alpine
+    container_name: mediaindex-postgres
+    restart: unless-stopped
+    networks:
+      # `backend` only, never `proxy`: the database is not internet-adjacent
+      # and nothing outside this stack has any business reaching it.
+      - backend
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-mediaindex}
+      - POSTGRES_USER=${POSTGRES_USER:?set it in the stack environment}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set it in the stack environment}
+    healthcheck:
+      # $$ so compose doesn't substitute; the shell inside the container does.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:17
+    container_name: mediaindex-pg-backup
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      # Dumps contain the per-user AES keys and the password hashes — keep
+      # this directory 0700 and out of any unencrypted sync. Media files are
+      # NOT in here; media_files/ and thumbnails/ need their own backup.
+      - ${INDEX_ROOT:-.}/backups/postgres:/backups
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-mediaindex}
+      - POSTGRES_USER=${POSTGRES_USER:?set it in the stack environment}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set it in the stack environment}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=14
+      - BACKUP_KEEP_WEEKS=8
+    depends_on:
+      postgres:
+        condition: service_healthy
+  discord-bot:
+    image: index-discord-bot:latest
+    container_name: mediaindex-discord-bot
+    restart: unless-stopped
+    # No capabilities needed: read-only mounts, downloads land on the
+    # container's own filesystem. yt-dlp here fetches attacker-chosen URLs.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - proxy
+      # Needed to reach redis, which lives on `backend` only.
+      - backend
+    volumes:
+      # Thumbnails and originals are attached to Discord messages straight
+      # from disk (/thumbs/ and /media/ on the web app require a login).
+      # Originals are only sent when they fit the guild's upload limit.
+      - ${INDEX_ROOT:-.}/thumbnails:/thumbnails:ro
+      - ${INDEX_ROOT:-.}/media_files:/media_files:ro
+    environment:
+      # Secrets come from the stack environment in Portainer (or ./.env
+      # for local `docker compose`) — never commit them here.
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:?set it in the stack environment}
+      - DISCORD_NOTIFY_CHANNEL_ID=${DISCORD_NOTIFY_CHANNEL_ID:?set it in the stack environment}
+      - DISCORD_INGEST_CHANNEL_ID=${DISCORD_INGEST_CHANNEL_ID:?set it in the stack environment}
+      # App password for the index's JSON upload API, generated on the
+      # index's /queue page while logged in as the bot account. Required:
+      # it is the bot's only upload transport, and the account's *login*
+      # password is never used.
+      # Not `:?` required, even though discord_bot/config.py does require
+      # it: a `:?` on a missing variable aborts interpolation for the whole
+      # compose file, so an unset bot password would stop web and postgres
+      # deploying too. Unset means the bot container crash-loops instead,
+      # naming the variable it wants.
+      - INDEX_BOT_APP_PASSWORD=${INDEX_BOT_APP_PASSWORD:-}
+      - INDEX_BOT_USERNAME=${INDEX_BOT_USERNAME:-Bot}
+      - INDEX_INTERNAL_URL=${INDEX_INTERNAL_URL:-http://web:5001}
+      - INDEX_PUBLIC_URL=${INDEX_PUBLIC_URL:-https://media.example.com}
+      # Built from REDIS_PASSWORD so the secret has one source. Keep it
+      # URL-safe (alphanumeric): a literal '@', ':' or '/' breaks urlsplit()
+      # in app/dav/__init__.py:_lock_storage().
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?set it in the stack environment}@redis:6379
+      - DISCORD_INGEST_TAGS=${DISCORD_INGEST_TAGS:-discord}
+      - AUTH_RETRY_SECONDS=${AUTH_RETRY_SECONDS:-900}
+      # Who owns an ingest is decided by the index: users link their
+      # Discord account via /settings (unlinked authors stay owned by the
+      # bot).
+      # Seconds the bot caches each answer.
+      - DISCORD_LOOKUP_TTL=${DISCORD_LOOKUP_TTL:-60}
+      # Role a member must hold before their media is ingested at all. This
+      # is the only gate on the unauthenticated path into yt-dlp and ffmpeg,
+      # so it is required rather than defaulted. Prefer the numeric role id
+      # (Developer Mode → right click the role → Copy Role ID); a
+      # non-numeric value matches by name.
+      - DISCORD_INGEST_ROLE=${DISCORD_INGEST_ROLE:?set it in the stack environment}
+      # Role holders may DM the bot; what they send is indexed *private* to
+      # their index account (needs the role above and a linked Discord
+      # account). 'false' disables.
+      - DISCORD_DM_INGEST=${DISCORD_DM_INGEST:-true}
+      # Seconds an untagged forward waits for the author's follow-up tag
+      # message before ingesting (0 = don't wait).
+      - DISCORD_FORWARD_TAG_WAIT=${DISCORD_FORWARD_TAG_WAIT:-15}
+      # Optional bot-logs channel: status lines for startup, each ingest
+      # result, tag matches, and failures. Empty = disabled.
+      - DISCORD_LOG_CHANNEL_ID=${DISCORD_LOG_CHANNEL_ID:-}
+      # Announcements attach the original file when it fits Discord's
+      # upload cap and fall back to the thumbnail when it doesn't. 'true'
+      # always posts the thumbnail instead, never the full file.
+      - DISCORD_NOTIFY_THUMBNAIL_ONLY=${DISCORD_NOTIFY_THUMBNAIL_ONLY:-false}
+      # yt-dlp link resolver: platform links (YouTube, TikTok, …) in the
+      # ingest channel are downloaded as real video files. 'false' disables.
+      - DISCORD_YTDLP=${DISCORD_YTDLP:-true}
+      - DISCORD_YTDLP_MAX_MB=${DISCORD_YTDLP_MAX_MB:-512}
+      # Abort a download only when it stalls (no progress for this many
+      # seconds); a large-but-healthy download is never cut off.
+      - DISCORD_YTDLP_STALL_TIMEOUT=${DISCORD_YTDLP_STALL_TIMEOUT:-120}
+      # Absolute backstop for a resolve that hangs before downloading.
+      - DISCORD_YTDLP_MAX_DURATION=${DISCORD_YTDLP_MAX_DURATION:-1800}
+      # Site logins (YouTube, Instagram, X, Facebook, Reddit, other sites)
+      # are uploaded on the index's /admin/site-logins page and fetched per
+      # link. This optional mounted cookies.txt is only the fallback for a
+      # site with no login there: mount the file (e.g. in
+      # docker-compose.override.yml) and set its in-container path.
+      - DISCORD_YTDLP_COOKIES=${DISCORD_YTDLP_COOKIES:-}
+      # Resolution cap (best/2160/1440/1080/720/480), H.264 preferred at any
+      # height. 1080 keeps a platform video inside DISCORD_YTDLP_MAX_MB.
+      - DISCORD_YTDLP_QUALITY=${DISCORD_YTDLP_QUALITY:-1080}
+      # The bgutil service below. Empty turns PO tokens off.
+      - DISCORD_YTDLP_POT_PROVIDER=${DISCORD_YTDLP_POT_PROVIDER-http://bgutil:4416}
+      # A link no yt-dlp extractor claims is probed (metadata only, public
+      # addresses only) before anything downloads; capped per message so
+      # a link dump can't become a crawl. 0 = never.
+      - DISCORD_YTDLP_MAX_PROBES=${DISCORD_YTDLP_MAX_PROBES:-4}
+      - DISCORD_YTDLP_PROBE_TIMEOUT=${DISCORD_YTDLP_PROBE_TIMEOUT:-45}
+      # Retry queue for ingests that failed transiently (Redis-backed, so
+      # it survives a bot restart). 'false' disables.
+      - DISCORD_INGEST_RETRY=${DISCORD_INGEST_RETRY:-true}
+      - DISCORD_INGEST_RETRY_ATTEMPTS=${DISCORD_INGEST_RETRY_ATTEMPTS:-5}
+      - DISCORD_INGEST_RETRY_POLL=${DISCORD_INGEST_RETRY_POLL:-30}
+      - DISCORD_INGEST_RETRY_DELAY=${DISCORD_INGEST_RETRY_DELAY:-60}
+      - DISCORD_INGEST_RETRY_MAX_DELAY=${DISCORD_INGEST_RETRY_MAX_DELAY:-3600}
+    depends_on:
+      - web
+      - redis
+      - bgutil
+  bgutil:
+    # YouTube PO-token provider for both bots' yt-dlp (the bots carry its
+    # plugin, bgutil-ytdlp-pot-provider). With it, most public YouTube
+    # videos download from a server IP without any login; without it they
+    # come back "Sign in to confirm you're not a bot".
+    #
+    # Pinned by digest (server 2.0.2, the build of 2026-10-07), and paired
+    # with the plugin pinned in both bot Dockerfiles (2.0.2). The pair has
+    # to match: a 2.x plugin refuses a 1.x server outright ("major versions
+    # are mismatched") and YouTube silently goes without PO tokens. To
+    # upgrade: docker pull brainicism/bgutil-ytdlp-pot-provider:latest,
+    # check GET /ping's version, paste the new digest from
+    #   docker image inspect brainicism/bgutil-ytdlp-pot-provider:latest --format '{{index .RepoDigests 0}}'
+    # and bump the plugin to the same version in both Dockerfiles.
+    image: brainicism/bgutil-ytdlp-pot-provider@sha256:d7d34108b76e52c7d3b575fe9e797e4bf41c1b2a08f80c5292eff6f851ce8472
+    container_name: mediaindex-bgutil
+    restart: unless-stopped
+    # node runs as PID 1 otherwise, which neither reaps children nor
+    # passes on the stop signal.
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      # `backend` only: the bots are its only clients. It needs outbound
+      # internet (it fetches YouTube's BotGuard challenge), which `backend`
+      # has; nothing outside this stack can reach it.
+      - backend
+  telegram-bot-api:
+    # Telegram's own Bot API server, run locally. The whole reason it is
+    # here: api.telegram.org refuses to serve a bot any file over 20 MB,
+    # which capped Telegram ingest far below what the web form and WebDAV
+    # accept. Running the server ourselves raises that to 2000 MB, and in
+    # `--local` mode getFile answers with a path on disk instead of a URL,
+    # so the bot reads the file straight off the shared volume and never
+    # downloads it over HTTP at all.
+    #
+    # BEFORE first use the bot must be logged out of the cloud API, once:
+    #   curl -s "https://api.telegram.org/bot<TOKEN>/logOut"
+    # Telegram will not let a local server take over a bot that is still
+    # signed in centrally, and the symptom is an unhelpful 401 at startup.
+    # Pinned by digest (Bot API 10.2, the build of 2026-08-20):
+    # `:latest` would let a redeploy silently swap the server holding the
+    # bot's token. To upgrade: docker pull aiogram/telegram-bot-api:latest,
+    # then paste the new digest from
+    #   docker image inspect aiogram/telegram-bot-api:latest --format '{{index .RepoDigests 0}}'
+    image: aiogram/telegram-bot-api@sha256:6706cc91b0d630b90e246567c1735e13c0cc152f5832e79db708d6c6de4dff3f
+    container_name: mediaindex-telegram-bot-api
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # These three are required and must stay — with a bare `cap_drop: ALL`
+    # this container crash-loops before it ever serves a request:
+    #   CHOWN  — the entrypoint chowns the work dir to the service user,
+    #            and its `set -e` turns the EPERM into an immediate exit.
+    #   SETUID
+    #   SETGID — telegram-bot-api starts as root and drops to its own
+    #            unprivileged user (--username/--groupname). Without SETGID
+    #            it fails at "Failed to clear supplementary group list".
+    # Verified: with CHOWN alone it still dies on the group list. It ends up
+    # running as uid 101 either way, which is the point — these buy the
+    # privilege drop, they do not skip it.
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    networks:
+      - backend                      # NOT proxy — only the bot talks to it
+    volumes:
+      # Shared with telegram-bot at the SAME path. python-telegram-bot
+      # decides a getFile answer is a local file by stat-ing it, so a path
+      # that differs between the two containers does not raise — it
+      # silently degrades to treating it as a URL.
+      - telegram_api_data:/var/lib/telegram-bot-api
+    environment:
+      # api_id / api_hash for the *server* (not the bot token) — create
+      # them at https://my.telegram.org under "API development tools".
+      # Not `:?` required: a `:?` on a missing variable aborts
+      # interpolation for the whole compose file, which would stop web and
+      # postgres deploying over an unconfigured sidecar. Unset means this
+      # container crash-loops instead, and its entrypoint names the
+      # variable it wants.
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID:-}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH:-}
+      # Any non-empty value adds --local, which is what lifts the limit.
+      - TELEGRAM_LOCAL=1
+      - TELEGRAM_WORK_DIR=/var/lib/telegram-bot-api
+  telegram-bot:
+    image: index-telegram-bot:latest
+    container_name: mediaindex-telegram-bot
+    restart: unless-stopped
+    # Same hardening as discord-bot, and still no bind mounts at all: it
+    # never announces anything, so it has no reason to read thumbnails or
+    # media_files. It does carry ffmpeg and yt-dlp, but only for the link
+    # resolver (TELEGRAM_LINKS) — media a user uploads to Telegram is
+    # moved byte-for-byte and decoded by the web container.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - proxy      # reaches web:5001
+      - backend    # reaches redis and telegram-bot-api
+    # Runs as the telegram-bot-api image's uid, not root. The server writes
+    # downloaded files 0644 into a 0755 dir it owns, and this container
+    # drops every capability including DAC_OVERRIDE — so as root it could
+    # read those files but never delete them, and the volume would grow
+    # without bound at up to 2000 MB per ingest. Sharing the uid is what
+    # makes the cleanup in _discard() actually work.
+    user: "101:101"
+    volumes:
+      # Same path as in telegram-bot-api — see the note there.
+      - telegram_api_data:/var/lib/telegram-bot-api
+    environment:
+      # Secrets come from the stack environment in Portainer (or ./.env
+      # for local `docker compose`) — never commit them here.
+      # Deliberately NOT a `:?` required variable. `:?` aborts
+      # interpolation for the *whole* compose file, so an unset token here
+      # would stop web, postgres and discord-bot from deploying too —
+      # adding an optional new service must never be able to take the
+      # index down. Unset simply means the bot container crash-loops, and
+      # telegram_bot/config.py names the missing variable when it does.
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      # The index account the bot authenticates as. It must be listed in
+      # the web service's DELEGATED_UPLOADERS: the bot owns nothing
+      # itself, it uploads on behalf of whoever linked the sending
+      # Telegram account, and /api/telegram/user is restricted to
+      # delegated accounts too. The app password is generated on /queue.
+      - INDEX_BOT_USERNAME=${INDEX_BOT_USERNAME:-Bot}
+      - INDEX_BOT_APP_PASSWORD=${INDEX_BOT_APP_PASSWORD:-}
+      - INDEX_INTERNAL_URL=${INDEX_INTERNAL_URL:-http://web:5001}
+      - INDEX_PUBLIC_URL=${INDEX_PUBLIC_URL:-https://media.example.com}
+      # Same credential as web — see the note there.
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?set it in the stack environment}@redis:6379
+      - TELEGRAM_INGEST_TAGS=${TELEGRAM_INGEST_TAGS:-telegram}
+      # Seconds an album's members are collected before the group's single
+      # caption is applied to all of them.
+      - TELEGRAM_ALBUM_WAIT=${TELEGRAM_ALBUM_WAIT:-2}
+      # How long untagged media waits for its tags before being forgotten,
+      # and how many items one user may have waiting.
+      - TELEGRAM_PENDING_TTL=${TELEGRAM_PENDING_TTL:-86400}
+      - TELEGRAM_PENDING_MAX=${TELEGRAM_PENDING_MAX:-100}
+      - TELEGRAM_UNLINKED_NOTICE_EVERY=${TELEGRAM_UNLINKED_NOTICE_EVERY:-3600}
+      - AUTH_RETRY_SECONDS=${AUTH_RETRY_SECONDS:-900}
+      # Local Bot API server. Empty falls back to api.telegram.org and its
+      # 20 MB getFile ceiling; set to the sidecar to get 2000 MB.
+      - TELEGRAM_API_BASE=${TELEGRAM_API_BASE-http://telegram-bot-api:8081}
+      - TELEGRAM_API_WORK_DIR=/var/lib/telegram-bot-api
+      # Links. Send the bot a URL and it downloads what the URL points at:
+      # a direct media link is streamed to disk, anything else is offered
+      # to yt-dlp, which only accepts a URL a real (non-generic) extractor
+      # claims. 'false' turns the whole feature off; TELEGRAM_YTDLP=false
+      # keeps direct file links and drops the resolver.
+      - TELEGRAM_LINKS=${TELEGRAM_LINKS:-true}
+      - TELEGRAM_LINK_MAX_MB=${TELEGRAM_LINK_MAX_MB:-512}
+      - TELEGRAM_YTDLP=${TELEGRAM_YTDLP:-true}
+      - TELEGRAM_YTDLP_MAX_MB=${TELEGRAM_YTDLP_MAX_MB:-512}
+      - TELEGRAM_YTDLP_STALL_TIMEOUT=${TELEGRAM_YTDLP_STALL_TIMEOUT:-120}
+      - TELEGRAM_YTDLP_MAX_DURATION=${TELEGRAM_YTDLP_MAX_DURATION:-1800}
+      # Same as discord-bot: site logins come from /admin/site-logins, the
+      # cap prefers H.264 at ≤1080p, and PO tokens come from bgutil. The
+      # optional cookies.txt is the fallback for a site with no login there.
+      - TELEGRAM_YTDLP_COOKIES=${TELEGRAM_YTDLP_COOKIES:-}
+      - TELEGRAM_YTDLP_QUALITY=${TELEGRAM_YTDLP_QUALITY:-1080}
+      - TELEGRAM_YTDLP_POT_PROVIDER=${TELEGRAM_YTDLP_POT_PROVIDER-http://bgutil:4416}
+    depends_on:
+      - web
+      - redis
+      - telegram-bot-api
+      - bgutil
+volumes:
+  redis_data:
+  pg_data:
+  telegram_api_data:
+
+networks:
+  proxy:
+    external: true
+  # Internal-only network for backing services. Never add `proxy` to anything
+  # that lives here: every container on a shared proxy network could reach
+  # it.
+  backend:
+    driver: bridge

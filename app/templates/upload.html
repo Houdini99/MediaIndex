@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Upload{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title">Upload</div>
+    <div class="page-sub">Upload images, GIFs, and videos</div>
+  </div>
+
+  <div class="upload-layout">
+    <div class="upload-card">
+      <form id="uploadForm" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input id="filesInput" type="file" name="files" multiple
+               accept="image/*,video/*,.webp,.heic,.gif">
+
+        <div class="drop-zone" id="dropZone">
+          <span class="drop-zone-icon">&#8659;</span>
+          <h3>Drag files here</h3>
+          <p>or <em>Select files</em></p>
+        </div>
+
+        <div id="previews"></div>
+
+        <button class="upload-btn" type="submit">Start upload</button>
+      </form>
+    </div>
+
+    <div class="info-card">
+      <div class="info-card-title">Information</div>
+      <div class="info-row">
+        <span class="info-key">Images</span>
+        <div class="info-val">
+          <div class="format-chips">
+            <span class="format-chip">jpg</span>
+            <span class="format-chip">png</span>
+            <span class="format-chip">webp</span>
+            <span class="format-chip">heic</span>
+          </div>
+        </div>
+      </div>
+      <div class="info-row">
+        <span class="info-key">GIF</span>
+        <div class="info-val"><div class="format-chips"><span class="format-chip">gif</span></div></div>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Videos</span>
+        <div class="info-val">
+          <div class="format-chips">
+            <span class="format-chip">mp4</span>
+            <span class="format-chip">webm</span>
+            <span class="format-chip">avi</span>
+            <span class="format-chip">mov</span>
+            <span class="format-chip">mkv</span>
+          </div>
+        </div>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Max. Size</span>
+        <span class="info-val">10 GiB</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Duplicates</span>
+        <span class="info-val">will be skipped</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Tags</span>
+        <span class="info-val">comma-separated</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/tag-autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>{% endblock %}

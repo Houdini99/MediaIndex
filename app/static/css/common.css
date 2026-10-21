@@ -1,0 +1,418 @@
+:root {
+        /* The nav's height. The feed sizes every slide against it, so it is
+           a variable rather than a number repeated across three files;
+           feed.css derives --feed-nav-h from it. */
+        --nav-h:        58px;
+        --bg:           #020408;
+        --bg2:          #060a12;
+        --surface:      #0c1018;
+        --surf2:        #131920;
+        --surf3:        #1a2230;
+        --border:       rgba(255,255,255,.07);
+        --border2:      rgba(255,255,255,.12);
+        --border-hi:    rgba(124,106,255,.55);
+        --text:         #e8edf5;
+        --text2:        #a8b3c2;
+        --muted:        #58687a;
+        --accent:       #7c6aff;
+        --accent2:      #5b4de8;
+        --accent-glow:  rgba(124,106,255,.35);
+        --success:      #3fb950;
+        --danger:       #f85149;
+        --warning:      #d29922;
+        --r:            12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+        color-scheme: dark;
+        scroll-behavior: smooth;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surf3); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    body {
+        background: var(--bg);
+        background-image:
+            radial-gradient(ellipse 100% 40% at 50% 0%,
+                rgba(109,81,255,.13) 0%,
+                transparent 60%);
+        color: var(--text);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        font-size: 15px;
+        line-height: 1.6;
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── NAVIGATION ─────────────────────────────────────────────────────── */
+    nav {
+        height: var(--nav-h);
+        background: rgba(2,4,8,.88);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 1.75rem;
+        gap: .75rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+    }
+
+    .brand {
+        font-weight: 700;
+        font-size: .9rem;
+        color: var(--text);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        letter-spacing: -.025em;
+        flex-shrink: 0;
+        transition: opacity .15s;
+    }
+    .brand:hover { opacity: .75; }
+
+    .brand-mark {
+        width: 28px; height: 28px;
+        background: linear-gradient(145deg, #8b7bff 0%, #5b4de8 55%, #a855f7 100%);
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: .78rem; font-weight: 900; color: #fff;
+        box-shadow: 0 0 18px rgba(124,106,255,.5), 0 2px 8px rgba(0,0,0,.6);
+        flex-shrink: 0;
+        letter-spacing: 0;
+    }
+
+    .brand-name {
+        background: linear-gradient(90deg, var(--text) 0%, var(--text2) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .nav-sep {
+        width: 1px; height: 18px;
+        background: var(--border);
+        flex-shrink: 0;
+        margin: 0 .25rem;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: .1rem;
+        flex: 1;
+    }
+
+    .nav-links a {
+        position: relative;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: .82rem;
+        font-weight: 500;
+        padding: .38rem .75rem;
+        border-radius: 7px;
+        transition: color .15s, background .15s;
+        letter-spacing: -.01em;
+    }
+    .nav-links a:hover  { color: var(--text2); background: rgba(255,255,255,.04); }
+    .nav-links a.active { color: var(--text);  background: rgba(255,255,255,.06); }
+    .nav-badge {
+        display: inline-block;
+        min-width: 1.15rem;
+        padding: .05rem .3rem;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-size: .66rem;
+        font-weight: 700;
+        text-align: center;
+        vertical-align: text-top;
+    }
+    .nav-links a.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px; left: 50%;
+        transform: translateX(-50%);
+        width: 18px; height: 2px;
+        background: linear-gradient(90deg, var(--accent), #a855f7);
+        border-radius: 99px;
+        box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .nav-right {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        flex-shrink: 0;
+    }
+
+    .user-chip {
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .28rem .65rem .28rem .38rem;
+        background: var(--surf2);
+        border: 1px solid var(--border);
+        border-radius: 99px;
+        font-size: .8rem;
+        color: var(--text2);
+        letter-spacing: -.01em;
+        transition: border-color .15s;
+    }
+    .user-chip:hover { border-color: var(--border2); }
+
+    .user-avatar {
+        width: 20px; height: 20px;
+        background: linear-gradient(135deg, var(--accent), #a855f7);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: .62rem; font-weight: 800; color: #fff;
+        flex-shrink: 0;
+    }
+
+    /* Icon-only tab: sized off the box, not the (absent) text, so it stays
+       square next to the pill-shaped user chip. */
+    .nav-cog {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px; height: 30px;
+        flex-shrink: 0;
+        color: var(--muted);
+        border: 1px solid transparent;
+        border-radius: 7px;
+        transition: all .15s;
+    }
+    .nav-cog svg { display: block; }
+    .nav-cog:hover {
+        color: var(--text2);
+        background: rgba(255,255,255,.04);
+        border-color: var(--border);
+    }
+    .nav-cog.active {
+        color: var(--text);
+        background: rgba(255,255,255,.06);
+        border-color: var(--border2);
+    }
+
+    .nav-admin {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: .78rem;
+        padding: .3rem .6rem;
+        border: 1px solid rgba(124,106,255,.22);
+        border-radius: 7px;
+        transition: all .15s;
+        white-space: nowrap;
+        letter-spacing: -.01em;
+    }
+    .nav-admin:hover,
+    .nav-admin.active {
+        background: rgba(124,106,255,.1);
+        border-color: rgba(124,106,255,.45);
+        color: #a99bff;
+    }
+
+    .nav-logout {
+        color: var(--danger);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: .78rem;
+        padding: .3rem .6rem;
+        border: 1px solid rgba(248,81,73,.18);
+        border-radius: 7px;
+        transition: all .15s;
+        white-space: nowrap;
+        letter-spacing: -.01em;
+    }
+    .nav-logout:hover {
+        background: rgba(248,81,73,.1);
+        border-color: rgba(248,81,73,.4);
+        color: #ff7b72;
+    }
+
+    /* ── LAYOUT ─────────────────────────────────────────────────────────── */
+    .container {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 1.75rem 1.5rem;
+    }
+
+    /* ── FLASH MESSAGES ─────────────────────────────────────────────────── */
+    .flashes { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: .4rem; }
+
+    .flash {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        padding: .7rem 1rem;
+        border-radius: 9px;
+        font-size: .845rem;
+        border: 1px solid;
+        animation: fadeSlide .22s ease;
+    }
+    @keyframes fadeSlide {
+        from { opacity: 0; transform: translateY(-5px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .flash-icon {
+        width: 18px; height: 18px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: .65rem; font-weight: 900; flex-shrink: 0;
+    }
+    .flash-success { background: rgba(63,185,80,.07); border-color: rgba(63,185,80,.22); color: var(--success); }
+    .flash-success .flash-icon { background: rgba(63,185,80,.15); color: var(--success); }
+    .flash-warning { background: rgba(210,153,34,.07); border-color: rgba(210,153,34,.22); color: var(--warning); }
+    .flash-warning .flash-icon { background: rgba(210,153,34,.15); color: var(--warning); }
+    .flash-danger  { background: rgba(248,81,73,.07);  border-color: rgba(248,81,73,.22);  color: var(--danger);  }
+    .flash-danger  .flash-icon { background: rgba(248,81,73,.15);  color: var(--danger);  }
+
+    /* ── BUTTONS ─────────────────────────────────────────────────────────── */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .5rem 1.1rem;
+        border-radius: 8px;
+        font-size: .845rem;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        text-decoration: none;
+        transition: all .18s cubic-bezier(.4,0,.2,1);
+        white-space: nowrap;
+        font-family: inherit;
+        letter-spacing: -.01em;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+        color: #fff;
+        box-shadow: 0 0 0 1px rgba(124,106,255,.25), 0 3px 12px rgba(124,106,255,.18);
+    }
+    .btn-primary:hover {
+        box-shadow: 0 0 0 1px rgba(124,106,255,.45), 0 4px 20px rgba(124,106,255,.3);
+        transform: translateY(-1px);
+        filter: brightness(1.07);
+        color: #fff;
+    }
+    .btn-ghost {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+    }
+    .btn-ghost:hover {
+        color: var(--text2);
+        border-color: var(--border2);
+        background: rgba(255,255,255,.04);
+    }
+
+    /* ── RESPONSIVE (shared) ─────────────────────────────────────────────── */
+    /* Visible to assistive tech only. Clipped rather than `display:none`,
+       which would take it out of the accessibility tree along with the
+       announcement. */
+    .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        margin: -1px; padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /* Nothing should ever be able to force the page wider than the screen */
+    img, video, svg { max-width: 100%; }
+
+    @media (max-width: 680px) {
+        nav {
+            /* Height deliberately untouched here: --nav-h drives the feed's
+               slide sizing, and changing it per-breakpoint would desync the
+               scroll-snap boundaries. Pad instead. */
+            padding: 0 .85rem;
+            gap: .35rem;
+        }
+        .brand-name { display: none; }
+        .nav-sep { display: none; }
+
+        /* Let the links shrink and scroll horizontally instead of pushing
+           the user chip / sign-out off the edge of the screen. */
+        .nav-links {
+            gap: 0;
+            min-width: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .nav-links::-webkit-scrollbar { display: none; }
+        .nav-links a {
+            padding: .35rem .5rem;
+            font-size: .8rem;
+            white-space: nowrap;
+        }
+
+        .nav-right { gap: .4rem; min-width: 0; }
+        .user-chip {
+            max-width: 34vw;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    @media (max-width: 430px) {
+        /* Collapse the user chip down to just the avatar to reclaim width */
+        .user-chip {
+            gap: 0;
+            padding: .28rem;
+            font-size: 0;           /* hides the username text node */
+        }
+        .user-chip .user-avatar { font-size: .62rem; }  /* keep the initial */
+        .nav-logout { padding: .3rem .5rem; }
+        .nav-admin  { padding: .3rem .5rem; }
+        .nav-cog    { width: 28px; height: 28px; }
+    }
+
+    /* ── TAG AUTOCOMPLETE (js/tag-autocomplete.js) ──────────────────────── */
+    .tag-ac-list {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0; right: 0;
+        z-index: 300;
+        max-height: 240px;
+        overflow-y: auto;
+        background: var(--surf2);
+        border: 1px solid var(--border2);
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0,0,0,.6);
+    }
+    .tag-ac-list.up {
+        top: auto;
+        bottom: calc(100% + 4px);
+    }
+    .tag-ac-item {
+        padding: .42rem .7rem;
+        font-size: .82rem;
+        color: var(--text2);
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .tag-ac-item.active {
+        background: rgba(124,106,255,.18);
+        color: var(--text);
+    }

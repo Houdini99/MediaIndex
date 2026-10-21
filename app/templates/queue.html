@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Untagged{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/queue.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title">Untagged</div>
+    <div class="page-sub">Files dumped into your WebDAV folder, waiting for tags</div>
+  </div>
+
+  <div class="queue-layout">
+    <div class="queue-card">
+      <div id="queueEmpty" class="queue-empty" hidden>
+        <span class="queue-empty-icon">&#9729;</span>
+        <h3>Nothing waiting</h3>
+        <p>Drop files into your WebDAV folder and they will show up here.</p>
+      </div>
+      <div id="queueList"></div>
+    </div>
+
+    <div class="queue-side">
+    <div class="info-card">
+      <div class="info-card-title">Connect WebDAV</div>
+      <div class="info-row">
+        <span class="info-key">Address</span>
+        <span class="info-val"><code class="dav-url">{{ dav_url }}</code></span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Username</span>
+        <span class="info-val">{{ g.user.username }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Password</span>
+        <span class="info-val" id="davStatus">{{ 'App password set' if dav_configured else 'Not set up yet' }}</span>
+      </div>
+      <div id="davReveal" class="dav-reveal" hidden>
+        <div class="dav-reveal-note">Copy it now — it is only shown once.</div>
+        <code id="davPassword"></code>
+        <button type="button" class="btn" id="davCopyBtn">Copy</button>
+      </div>
+      <div class="dav-actions">
+        <button type="button" class="btn btn-primary" id="davGenerateBtn">
+          {{ 'Regenerate password' if dav_configured else 'Generate password' }}
+        </button>
+        <button type="button" class="btn" id="davRevokeBtn" {{ '' if dav_configured else 'hidden' }}>Revoke</button>
+      </div>
+      <div class="dav-hint">
+        Mount this address as a network drive (Windows: Map network drive,
+        macOS: Finder &rarr; Connect to Server, Android/iOS: any WebDAV-capable
+        file app) and sign in with the app password — not your login password.
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <datalist id="tag-suggestions"></datalist>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/queue.js') }}"></script>{% endblock %}

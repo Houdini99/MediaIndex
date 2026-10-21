@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Settings{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title">Settings</div>
+    <div class="page-sub">Your account and the services that upload on your behalf</div>
+  </div>
+
+  <div class="settings-layout">
+    <div class="info-card">
+      <div class="info-card-title">Password</div>
+      <form class="link-form password-form" method="post" action="{{ url_for('auth.change_password') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        {# For password managers, so they store the new password under this account. #}
+        <input type="text" name="username" value="{{ g.user.username }}" autocomplete="username" hidden>
+        <label class="link-label" for="currentPassword">Current password</label>
+        <input type="password" id="currentPassword" name="current_password" class="link-input"
+               required autocomplete="current-password">
+        <label class="link-label" for="newPassword">New password</label>
+        <input type="password" id="newPassword" name="new_password" class="link-input"
+               required minlength="8" placeholder="At least 8 characters" autocomplete="new-password">
+        <label class="link-label" for="confirmPassword">Repeat the new password</label>
+        <input type="password" id="confirmPassword" name="confirm_password" class="link-input"
+               required minlength="8" autocomplete="new-password">
+        <div class="link-actions">
+          <button type="submit" class="btn btn-primary">Change password</button>
+        </div>
+      </form>
+      <div class="settings-hint">
+        Changing your password logs you out on every other device. Your app
+        password for WebDAV and scripts, on the <a href="{{ url_for('media.queue') }}">Untagged</a>
+        page, stays the same.
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="info-card-title">Connect Telegram</div>
+      <div class="info-row">
+        <span class="info-key">Bot</span>
+        <span class="info-val">
+          {% if telegram_bot %}<code>@{{ telegram_bot }}</code>{% else %}<em>not configured</em>{% endif %}
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Status</span>
+        <span class="info-val" id="tgStatus">
+          {% if telegram_id %}Linked to ID {{ telegram_id }}
+          {% elif telegram_username %}Linked to @{{ telegram_username }} (unverified)
+          {% else %}Not linked{% endif %}
+        </span>
+      </div>
+      <div class="link-form">
+        <label class="link-label" for="tgIdentity">Telegram ID or @username</label>
+        <input type="text" id="tgIdentity" class="link-input" autocomplete="off"
+               placeholder="123456789"
+               value="{{ telegram_id or telegram_username or '' }}">
+        <div class="link-actions">
+          <button type="button" class="btn btn-primary" id="tgSaveBtn">Save</button>
+          <button type="button" class="btn" id="tgUnlinkBtn"
+                  {{ '' if (telegram_id or telegram_username) else 'hidden' }}>Unlink</button>
+        </div>
+      </div>
+      <div class="settings-hint">
+        Message the bot and everything you send gets indexed under your
+        account. Put your tags in the caption (<code>cats,funny</code>);
+        media with no tags is held until you send them.
+        <strong>Prefer the numeric ID</strong> — a @username can be released
+        and re-registered by someone else, who would then be uploading as
+        you. Send the bot <code>/start</code> and it will tell you your ID.
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="info-card-title">Connect Discord</div>
+      <div class="info-row">
+        <span class="info-key">Status</span>
+        <span class="info-val" id="dcStatus">
+          {% if discord_id %}Linked to ID {{ discord_id }}{% else %}Not linked{% endif %}
+        </span>
+      </div>
+      <div class="link-form">
+        <div class="dc-code" id="dcCodeBox" hidden>
+          <div class="link-label">Send this to the Discord bot as a direct message:</div>
+          <div class="dc-code-row">
+            <code id="dcCode"></code>
+            <button type="button" class="btn" id="dcCopyBtn">Copy</button>
+          </div>
+          <div class="settings-hint" id="dcCodeHint"></div>
+        </div>
+        <div class="link-actions">
+          <button type="button" class="btn btn-primary" id="dcCodeBtn">
+            {{ 'Link a different account' if discord_id else 'Get link code' }}
+          </button>
+          <button type="button" class="btn" id="dcUnlinkBtn"
+                  {{ '' if discord_id else 'hidden' }}>Unlink</button>
+        </div>
+      </div>
+      <div class="settings-hint">
+        Media you post in the Discord ingest channel is credited to your
+        account, and you can DM the bot to save media <strong>privately</strong>
+        (needs the server's ingest role). Linking proves the Discord account
+        is yours: get a code here and send it to the bot in a DM — it only
+        works once and expires after 10 minutes.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/settings.js') }}"></script>{% endblock %}

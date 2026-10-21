@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>{% block title %}MediaIndex{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="csrf-token" content="{{ csrf_token() }}"/>
+  <link rel="icon" href="{{ url_for('main.favicon') }}" type="image/x-icon"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body {% block body_data %}{% endblock %}>
+  {% include '_nav.html' %}
+  {% block content %}{% endblock %}
+  {# common.js first: it owns MI.esc and the delegated data-action /
+     data-confirm / data-autosubmit dispatchers every other script and
+     template relies on. The CSP forbids inline script, so server-side
+     values reach JS through `body_data` attributes rather than an inline
+     script element. #}
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Admin Panel{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">Admin Panel</div>
+      <div class="page-sub">User management, IP bans, and bulk tag operations</div>
+    </div>
+    {% include '_admin_tabs.html' %}
+  </div>
+
+  <!-- ── Overview ──────────────────────────────────────────────────────── -->
+  <div class="admin-stats-row">
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.users }}</div>
+      <div class="stat-label">Users</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.media }}</div>
+      <div class="stat-label">Media items</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.tags }}</div>
+      <div class="stat-label">Tags</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.storage }}</div>
+      <div class="stat-label">Storage · {{ stats.storage_detail }} · {{ stats.storage_free }} free</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.banned }}</div>
+      <div class="stat-label">Banned IPs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ stats.watchlist }}</div>
+      <div class="stat-label">IPs on watchlist</div>
+    </div>
+  </div>
+
+  <!-- ── Users ─────────────────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-title">Users</div>
+
+    <table class="admin-table">
+      <thead>
+        <tr><th>ID</th><th>Username</th><th>Role</th><th class="col-actions">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for uid, username, is_admin in users %}
+        <tr>
+          <td>{{ uid }}</td>
+          <td>{{ username }}{% if uid == g.user.id %} <span class="you-badge">you</span>{% endif %}</td>
+          <td>{% if is_admin %}<span class="role-badge role-admin">admin</span>{% else %}<span class="role-badge">user</span>{% endif %}</td>
+          <td class="col-actions">
+            <form method="post" action="{{ url_for('admin.change_password', user_id=uid) }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="password" name="password" placeholder="New password" minlength="8" required autocomplete="new-password">
+              <button type="submit" class="btn btn-ghost btn-sm">Set password</button>
+            </form>
+            {% if uid != g.user.id %}
+            <form method="post" action="{{ url_for('admin.toggle_admin', user_id=uid) }}" class="inline-form"
+                  {% if is_admin %}data-confirm="Revoke admin rights from “{{ username }}”?"{% endif %}>
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="make_admin" value="{{ 0 if is_admin else 1 }}"/>
+              <button type="submit" class="btn btn-ghost btn-sm">{{ 'Demote' if is_admin else 'Promote' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.remove_user', user_id=uid) }}" class="inline-form"
+                  data-confirm="Delete user “{{ username }}”? This cannot be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <select name="media_action" title="What happens to this user's uploads">
+                <option value="delete">…and delete their media</option>
+                {% for ouid, ousername, _ in users %}
+                {% if ouid != uid %}
+                <option value="reassign:{{ ouid }}">…and reassign media to {{ ousername }}</option>
+                {% endif %}
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="admin-subsection-title">Create a new user</div>
+    <form method="post" action="{{ url_for('admin.create_user') }}" class="admin-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="text" name="username" placeholder="Username" required autocomplete="off">
+      <input type="password" name="password" placeholder="Password (min. 8 characters)" minlength="8" required autocomplete="new-password">
+      <button type="submit" class="btn btn-primary btn-sm">Create user</button>
+    </form>
+  </div>
+
+  <!-- ── IP bans ───────────────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-title">Active IP bans</div>
+    {% if banned_ips %}
+    <table class="admin-table">
+      <thead>
+        <tr><th>IP address</th><th>Failed attempts</th><th>Last attempt</th><th>Type</th><th class="col-actions">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for ip, count, last_attempt, manual in banned_ips %}
+        <tr>
+          <td class="mono">{{ ip }}</td>
+          <td>{{ count }}</td>
+          <td>{{ last_attempt or '—' }}</td>
+          <td>{{ 'manual (permanent)' if manual else 'automatic' }}</td>
+          <td class="col-actions">
+            <form method="post" action="{{ url_for('admin.lift_ban') }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="ip" value="{{ ip }}"/>
+              <button type="submit" class="btn btn-ghost btn-sm">Lift ban</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="admin-empty">No IPs are currently banned.</p>
+    {% endif %}
+
+    <div class="admin-subsection-title">Watchlist — failed logins below the ban threshold ({{ ban_threshold }})</div>
+    {% if watchlist %}
+    <table class="admin-table">
+      <thead>
+        <tr><th>IP address</th><th>Failed attempts</th><th>Last attempt</th><th class="col-actions">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for ip, count, last_attempt in watchlist %}
+        <tr>
+          <td class="mono">{{ ip }}</td>
+          <td>{{ count }} / {{ ban_threshold }}{% if count >= ban_threshold // 2 %} <span class="warn-badge">⚠</span>{% endif %}</td>
+          <td>{{ last_attempt or '—' }}</td>
+          <td class="col-actions">
+            <form method="post" action="{{ url_for('admin.ban') }}" class="inline-form"
+                  data-confirm="Ban {{ ip }} now?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+              <input type="hidden" name="ip" value="{{ ip }}"/>
+              <button type="submit" class="btn btn-danger btn-sm">Ban now</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="admin-empty">No IPs with recent failed login attempts.</p>
+    {% endif %}
+
+    <div class="admin-subsection-title">Ban an IP manually</div>
+    <form method="post" action="{{ url_for('admin.ban') }}" class="admin-form"
+          data-confirm="Ban {ip}?">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="text" name="ip" placeholder="IP address (v4 or v6)" required autocomplete="off">
+      <button type="submit" class="btn btn-danger btn-sm">Ban IP</button>
+    </form>
+  </div>
+
+  <!-- ── Tags ──────────────────────────────────────────────────────────── -->
+  <div class="admin-section">
+    <div class="admin-section-title">Tag management</div>
+
+    <div class="admin-subsection-title">Rename a tag</div>
+    <form method="post" action="{{ url_for('admin.tag_rename') }}" class="admin-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="text" name="old" placeholder="Old tag" required autocomplete="off">
+      <input type="text" name="new" placeholder="New tag" required autocomplete="off">
+      <label class="dry-run-label"><input type="checkbox" name="dry_run" value="1"> Dry run (preview only)</label>
+      <button type="submit" class="btn btn-primary btn-sm">Rename</button>
+    </form>
+
+    <div class="admin-subsection-title">Remove a tag</div>
+    <form method="post" action="{{ url_for('admin.tag_remove') }}" class="admin-form"
+          data-confirm="Remove this tag from all media rows?" data-confirm-unless="dry_run">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <input type="text" name="tag" placeholder="Tag to remove" required autocomplete="off">
+      <label class="dry-run-label"><input type="checkbox" name="dry_run" value="1"> Dry run (preview only)</label>
+      <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+    </form>
+
+    {% if tag_result %}
+    <div class="tag-result">
+      <div class="admin-subsection-title">{{ tag_result.action }} — {{ tag_result.changes|length }} row(s) affected</div>
+      {% if tag_result.changes %}
+      <div class="tag-result-scroll">
+        <table class="admin-table">
+          <thead><tr><th>ID</th><th>Before</th><th>After</th></tr></thead>
+          <tbody>
+            {% for mid, before, after in tag_result.changes %}
+            <tr>
+              <td>#{{ mid }}</td>
+              <td class="mono">{{ before }}</td>
+              <td class="mono">{{ after or '(empty)' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="admin-empty">No rows would change.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

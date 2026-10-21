@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Logs{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">Logs</div>
+      <div class="page-sub">Read-only view of the application log and the security log</div>
+    </div>
+    {% include '_admin_tabs.html' %}
+  </div>
+
+  <div class="admin-section">
+    <form method="get" action="{{ url_for('admin.logs') }}" class="admin-form log-toolbar">
+      <select name="file">
+        <optgroup label="Application log">
+          {% for f in files if not f.startswith('security/') %}
+          <option value="{{ f }}" {{ 'selected' if f == selected }}>{{ f }}{{ ' (current)' if f == 'app.log' }}</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="Security log">
+          {% for f in files if f.startswith('security/') %}
+          <option value="{{ f }}" {{ 'selected' if f == selected }}>{{ f[9:] }}</option>
+          {% endfor %}
+        </optgroup>
+      </select>
+      <select name="lines">
+        {% for n in line_choices %}
+        <option value="{{ n }}" {{ 'selected' if n == lines }}>last {{ n }} lines</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="q" value="{{ query }}" placeholder="Filter (case-insensitive)…" autocomplete="off">
+      <button type="submit" class="btn btn-primary btn-sm">Show</button>
+    </form>
+
+    {% if error %}
+    <p class="admin-empty">Could not read the log file: {{ error }}</p>
+    {% elif not files %}
+    <p class="admin-empty">No log files found.</p>
+    {% elif not content %}
+    <p class="admin-empty">{% if query %}No lines match "{{ query }}".{% else %}The file is empty.{% endif %}</p>
+    {% else %}
+    <div class="log-meta">{{ selected }} — showing {{ content|length }} line(s){% if query %} matching "{{ query }}"{% endif %}</div>
+    <pre class="log-view" id="logView" data-scroll-bottom>{% for line in content %}{{ line }}
+{% endfor %}</pre>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}MediaIndex — Tags{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">{% endblock %}
+{% block body_data %}
+  data-total-tags="{{ total_tags }}"
+  data-index-url="{{ url_for('media.index') }}"
+  {%- if g.user and g.user.is_admin %}
+  data-rename-tag-url="{{ url_for('admin.tag_rename') }}"
+  data-remove-tag-url="{{ url_for('admin.tag_remove') }}"
+  {%- endif %}
+{% endblock %}
+{% block content %}
+<div class="container">
+  {% include '_flash.html' %}
+  <div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">Tags</div>
+      <div class="page-sub">All tags used and their frequency</div>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num">{{ total_tags }}</div>
+      <div class="stat-label">Various Tags</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ total_usages }}</div>
+      <div class="stat-label">Usages</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">{{ "%.1f"|format(total_usages / total_tags if total_tags > 0 else 0) }}</div>
+      <div class="stat-label">Ø per Tag</div>
+    </div>
+  </div>
+
+  <div class="tag-toolbar">
+    <div class="tag-search-wrap">
+      <span class="s-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3"/>
+        </svg>
+      </span>
+      <input type="text" id="tagSearch" placeholder="Filter tags…">
+    </div>
+    <span id="tagCount" class="tag-count-display">{{ total_tags }} Tags</span>
+  </div>
+
+  {% if tag_stats %}
+    <div class="tag-list" id="tagsContainer">
+      {% set max_count = tag_stats[0][1] if tag_stats else 1 %}
+      {% for tag, count in tag_stats %}
+        {%- set dot_cls = 'is-user' if tag.startswith('user:') else ('is-type' if tag in ['image','gif','video'] else 'is-other') -%}
+        <div class="tag-item" data-tag="{{ tag.lower() }}">
+          <span class="tag-dot {{ dot_cls }}"></span>
+          <span class="tag-name {% if tag.startswith('user:') %}is-user{% elif tag in ['image','gif','video'] %}is-type{% endif %}">{{ tag }}</span>
+          <div class="tag-bar-track">
+            <div class="tag-bar-fill" style="width:{{ (count / max_count * 100)|round(1) }}%"></div>
+          </div>
+          <span class="tag-count">{{ count }}</span>
+          {% if g.user and g.user.is_admin %}
+          <span class="tag-admin-actions">
+            <button type="button" class="tag-act tag-act-rename" data-tag="{{ tag }}" title="Rename this tag everywhere">✎</button>
+            <button type="button" class="tag-act tag-act-remove" data-tag="{{ tag }}" title="Remove this tag everywhere">✕</button>
+          </span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="no-tags-msg">
+      <div class="empty-icon">&#127991;</div>
+      <p>No tags yet</p>
+      <p>Tags are assigned during upload or can be added later.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/tags.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,687 @@
+/* ── TOOLBAR ─────────────────────────────────────────────────────────── */
+    .toolbar {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 1.75rem;
+        padding: .75rem 1rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+    }
+
+    .search-group {
+        display: flex;
+        gap: .4rem;
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 120px;
+    }
+    .input-icon {
+        position: absolute;
+        left: .7rem;
+        color: var(--muted);
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+    }
+    .input-icon svg { width: 14px; height: 14px; }
+
+    .toolbar input,
+    .toolbar select {
+        background: var(--surf2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: .5rem .75rem;
+        font-size: .845rem;
+        font-family: inherit;
+        width: 100%;
+        transition: border-color .15s, box-shadow .15s, background .15s;
+        letter-spacing: -.01em;
+    }
+    .input-wrap input { padding-left: 2.2rem; }
+    .toolbar input:focus,
+    .toolbar select:focus {
+        outline: none;
+        border-color: var(--border-hi);
+        box-shadow: 0 0 0 3px rgba(124,106,255,.1);
+        background: var(--surf3);
+    }
+    .toolbar select {
+        min-width: 130px;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        padding-right: 2rem;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2358687a'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right .7rem center;
+    }
+    .toolbar-actions { display: flex; gap: .4rem; }
+
+    /* ── AI FILTER TOGGLE ────────────────────────────────────────────────── */
+    .ai-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        cursor: pointer;
+        user-select: none;
+        padding: .48rem .75rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--surf2);
+        font-size: .845rem;
+        color: var(--muted);
+        transition: all .15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .ai-toggle:hover { border-color: var(--border2); color: var(--text2); }
+    .ai-toggle input { display: none; }
+    .ai-toggle-track {
+        width: 28px; height: 16px;
+        border-radius: 99px;
+        background: var(--surf3);
+        border: 1px solid var(--border2);
+        position: relative;
+        flex-shrink: 0;
+        transition: background .15s, border-color .15s;
+    }
+    .ai-toggle-track::after {
+        content: '';
+        position: absolute;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        background: var(--muted);
+        top: 50%; left: 2px;
+        transform: translateY(-50%);
+        transition: left .15s, background .15s;
+    }
+    .ai-toggle input:checked ~ .ai-toggle-track {
+        background: rgba(248,81,73,.2);
+        border-color: rgba(248,81,73,.45);
+    }
+    .ai-toggle input:checked ~ .ai-toggle-track::after {
+        left: 14px;
+        background: var(--danger);
+    }
+    .ai-toggle:has(input:checked) {
+        border-color: rgba(248,81,73,.3);
+        background: rgba(248,81,73,.06);
+        color: var(--danger);
+    }
+    .ai-toggle.private-toggle input:checked ~ .ai-toggle-track {
+        background: var(--accent);
+    }
+    .ai-toggle.private-toggle:has(input:checked) {
+        border-color: rgba(124,106,255,.35);
+        background: rgba(124,106,255,.08);
+        color: var(--accent);
+    }
+
+    /* ── BULK SELECT ─────────────────────────────────────────────────────── */
+    #select-toggle.active {
+        border-color: rgba(124,106,255,.45);
+        background: rgba(124,106,255,.1);
+        color: var(--accent);
+    }
+
+    .bulk-bar {
+        display: none;
+        position: fixed;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 150; /* above cards, below the modal (200) */
+        width: max-content;
+        max-width: calc(100vw - 2rem);
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        flex-wrap: wrap;
+        padding: .6rem .9rem;
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: var(--r);
+        box-shadow: 0 12px 32px rgba(0,0,0,.55);
+        animation: bulkBarIn .2s ease;
+    }
+    @keyframes bulkBarIn {
+        from { opacity: 0; transform: translate(-50%, 8px); }
+        to   { opacity: 1; transform: translate(-50%, 0); }
+    }
+    /* Keep the last gallery row reachable behind the floating bar */
+    body.select-mode .gallery { padding-bottom: 4.5rem; }
+    /* With the tag editor open the bar needs a real width for the
+       flex-basis:100% editor row to wrap against (width: max-content
+       would otherwise balloon to the viewport cap). */
+    .bulk-bar:has(.bulk-tag-editor.active) { width: min(680px, calc(100vw - 2rem)); }
+    body.select-mode .bulk-bar { display: flex; }
+    .bulk-count {
+        font-size: .85rem;
+        font-weight: 600;
+        color: var(--text2);
+        white-space: nowrap;
+    }
+    .bulk-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .bulk-actions .btn:disabled { opacity: .4; cursor: default; }
+
+    /* Inline add/remove-tags editor, second row of the bulk bar */
+    .bulk-tag-editor {
+        display: none;
+        flex-basis: 100%;
+        gap: .4rem;
+        align-items: center;
+    }
+    .bulk-tag-editor.active { display: flex; }
+    .bulk-tag-wrap { position: relative; flex: 1; min-width: 200px; }
+    .bulk-tag-editor input {
+        width: 100%;
+        background: var(--surf2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: .45rem .7rem;
+        font-size: .845rem;
+        font-family: inherit;
+        transition: border-color .15s;
+    }
+    .bulk-tag-editor input:focus { outline: none; border-color: var(--border-hi); }
+    .bulk-delete-btn {
+        background: rgba(248,81,73,.12);
+        color: var(--danger);
+        border: 1px solid rgba(248,81,73,.3);
+    }
+    .bulk-delete-btn:hover:not(:disabled) {
+        background: rgba(220,38,38,.85);
+        color: #fff;
+        border-color: transparent;
+    }
+    .bulk-delete-btn:disabled { opacity: .4; cursor: default; }
+
+    /* Select mode: cards toggle selection instead of opening the lightbox */
+    body.select-mode .gallery-item { user-select: none; }
+    body.select-mode .action-buttons { display: none; }
+    body.select-mode .gallery-item:hover .thumb { transform: none; }
+
+    /* Checkbox indicator (top-left corner of the thumbnail) */
+    body.select-mode .thumb-wrapper::after {
+        content: '';
+        position: absolute;
+        top: .5rem; left: .5rem;
+        width: 20px; height: 20px;
+        border-radius: 6px;
+        border: 2px solid rgba(255,255,255,.75);
+        background: rgba(8,10,18,.55);
+        backdrop-filter: blur(6px);
+        z-index: 2;
+        transition: background .15s, border-color .15s;
+    }
+    body.select-mode .gallery-item.selected .thumb-wrapper::after {
+        content: '✓';
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .8rem;
+        font-weight: 700;
+        color: #fff;
+        background: var(--accent);
+        border-color: var(--accent);
+    }
+    body.select-mode .gallery-item.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(124,106,255,.35);
+    }
+    body.select-mode .gallery-item.selected .thumb { opacity: .75; }
+    /* Private badge sits top-left too — nudge it aside in select mode */
+    body.select-mode .type-badge.private { left: 2.4rem; }
+
+    /* ── COUNT BAR ───────────────────────────────────────────────────────── */
+    .count-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+    .count-label {
+        font-size: .8rem;
+        color: var(--muted);
+        letter-spacing: -.01em;
+    }
+
+    /* ── GALLERY ─────────────────────────────────────────────────────────── */
+    .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 1rem;
+    }
+
+    .gallery-item {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        overflow: hidden;
+        position: relative;
+        cursor: pointer;
+        transition: border-color .2s, transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s;
+    }
+    .gallery-item:hover {
+        border-color: rgba(124,106,255,.45);
+        transform: translateY(-3px);
+        box-shadow:
+            0 16px 40px rgba(0,0,0,.55),
+            0 0 0 1px rgba(124,106,255,.2),
+            0 0 30px rgba(124,106,255,.08);
+    }
+
+    .thumb-wrapper {
+        aspect-ratio: 1;
+        overflow: hidden;
+        background: var(--surf2);
+        position: relative;
+    }
+    .thumb {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform .35s cubic-bezier(.4,0,.2,1);
+    }
+    .gallery-item:hover .thumb { transform: scale(1.05); }
+
+    /* Type badge */
+    .type-badge {
+        position: absolute;
+        bottom: .45rem; left: .45rem;
+        padding: .15em .5em;
+        border-radius: 4px;
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(3px);
+        transition: opacity .2s, transform .2s;
+        backdrop-filter: blur(6px);
+    }
+    .gallery-item:hover .type-badge { opacity: 1; transform: translateY(0); }
+    .type-badge.video { background: rgba(92,124,255,.7); color: #c0cfff; border: 1px solid rgba(92,124,255,.3); }
+    .type-badge.gif   { background: rgba(168,85,247,.7); color: #e8c5ff; border: 1px solid rgba(168,85,247,.3); }
+    .type-badge.image  { background: rgba(20,160,120,.7); color: #a0f0d8; border: 1px solid rgba(20,160,120,.3); }
+    .type-badge.private {
+        bottom: auto;
+        top: .45rem; left: .45rem;
+        background: rgba(248,81,73,.78);
+        color: #ffd9d4;
+        border: 1px solid rgba(248,81,73,.35);
+        opacity: 1;
+        transform: none;
+    }
+
+    /* Hover gradient overlay */
+    .thumb-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(2,4,8,.7) 0%, transparent 50%);
+        opacity: 0;
+        transition: opacity .2s;
+        pointer-events: none;
+    }
+    .gallery-item:hover .thumb-overlay { opacity: 1; }
+
+    /* Card body */
+    .card-body {
+        padding: .6rem .7rem .7rem;
+    }
+    .card-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .25rem;
+        min-height: 1.5rem;
+    }
+
+    /* Tag pills */
+    .tag-pill {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(124,106,255,.1);
+        color: rgba(150,130,255,.9);
+        border: 1px solid rgba(124,106,255,.18);
+        border-radius: 4px;
+        padding: .08em .45em;
+        font-size: .68rem;
+        font-weight: 500;
+        letter-spacing: -.005em;
+        transition: background .15s, border-color .15s;
+    }
+    .tag-pill:hover { background: rgba(124,106,255,.18); border-color: rgba(124,106,255,.35); }
+    .tag-pill.user-tag {
+        background: rgba(210,153,34,.1);
+        color: rgba(240,190,60,.9);
+        border-color: rgba(210,153,34,.2);
+    }
+    .tag-pill.type-tag {
+        background: rgba(63,185,80,.09);
+        color: rgba(80,210,100,.9);
+        border-color: rgba(63,185,80,.2);
+    }
+    .no-tags {
+        font-size: .72rem;
+        color: var(--muted);
+        font-style: italic;
+    }
+
+    /* ── ACTION BUTTONS ──────────────────────────────────────────────────── */
+    .action-buttons {
+        position: absolute;
+        top: .5rem; right: .5rem;
+        display: flex;
+        gap: .3rem;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity .18s, transform .18s;
+        /* .thumb-wrapper is a later positioned sibling and would otherwise
+           paint over the buttons, making them invisible and unclickable */
+        z-index: 3;
+    }
+    .gallery-item:hover .action-buttons {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    /* No hover on touch screens — keep the buttons visible there */
+    @media (hover: none) {
+        .action-buttons { opacity: 1; transform: none; }
+    }
+    .action-btn {
+        width: 30px; height: 30px;
+        border-radius: 7px;
+        border: none;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: .85rem;
+        transition: all .15s;
+        backdrop-filter: blur(8px);
+    }
+    .edit-btn {
+        background: rgba(8,10,18,.75);
+        color: #93c5fd;
+        border: 1px solid rgba(147,197,253,.15);
+    }
+    .edit-btn:hover { background: rgba(99,102,241,.8); color: #fff; border-color: transparent; }
+    .delete-btn {
+        background: rgba(8,10,18,.75);
+        color: #fca5a5;
+        border: 1px solid rgba(252,165,165,.15);
+    }
+    .delete-btn:hover { background: rgba(220,38,38,.8); color: #fff; border-color: transparent; }
+
+    /* ── EDIT FORM ───────────────────────────────────────────────────────── */
+    .edit-form {
+        display: none;
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        background: rgba(6,10,18,.97);
+        padding: .65rem .7rem;
+        border-top: 1px solid var(--border);
+        backdrop-filter: blur(10px);
+    }
+    .edit-form.active { display: block; }
+    .edit-form input {
+        width: 100%;
+        background: var(--surf2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: .38rem .55rem;
+        font-size: .8rem;
+        font-family: inherit;
+        margin-bottom: .38rem;
+        transition: border-color .15s;
+    }
+    .edit-form input:focus { outline: none; border-color: var(--border-hi); }
+    .edit-form-btns { display: flex; gap: .3rem; justify-content: flex-end; }
+    .edit-form button {
+        padding: .27rem .65rem;
+        border-radius: 6px;
+        border: none;
+        font-size: .77rem;
+        cursor: pointer;
+        font-weight: 600;
+        font-family: inherit;
+        transition: all .15s;
+    }
+    .save-btn   { background: var(--accent); color: #fff; }
+    .save-btn:hover { background: var(--accent2); }
+    .cancel-btn { background: var(--surf3); color: var(--muted); border: 1px solid var(--border); }
+    .cancel-btn:hover { color: var(--text); }
+
+    /* ── MODAL ───────────────────────────────────────────────────────────── */
+    .modal-bg {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.82);
+        backdrop-filter: blur(10px) saturate(140%);
+        -webkit-backdrop-filter: blur(10px) saturate(140%);
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        padding: 1.25rem;
+        animation: none;
+    }
+    .modal-bg.active {
+        display: flex;
+        animation: modalBgIn .22s ease;
+    }
+    @keyframes modalBgIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+    .modal-box {
+        background: var(--surface);
+        border: 1px solid var(--border2);
+        border-radius: 16px;
+        width: min(92vw, 1000px);
+        max-height: 90vh;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 32px 80px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.06);
+        animation: modalBoxIn .22s cubic-bezier(.4,0,.2,1);
+        display: flex;
+        flex-direction: column;
+    }
+    @keyframes modalBoxIn {
+        from { opacity: 0; transform: scale(.96) translateY(8px); }
+        to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: .75rem 1rem;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+    .modal-title {
+        font-size: .8rem;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+    .modal-header-actions { display: flex; gap: .4rem; }
+    .modal-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        background: var(--surf2);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: .3rem .65rem;
+        font-size: .8rem;
+        color: var(--muted);
+        cursor: pointer;
+        text-decoration: none;
+        transition: all .15s;
+        font-family: inherit;
+    }
+    .modal-btn:hover { color: var(--text); border-color: var(--border2); background: var(--surf3); }
+    .modal-close {
+        width: 28px; height: 28px; padding: 0;
+        background: var(--surf2);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--muted);
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: .9rem;
+        transition: all .15s;
+        font-family: inherit;
+    }
+    .modal-close:hover { background: rgba(248,81,73,.15); border-color: rgba(248,81,73,.3); color: var(--danger); }
+    .modal-body {
+        overflow: auto;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,.25);
+        padding: 1rem;
+        min-height: 0;
+        position: relative;
+    }
+    .modal-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        border: 1px solid var(--border2);
+        background: rgba(8,10,18,.75);
+        color: var(--text);
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        backdrop-filter: blur(8px);
+        transition: background .15s, opacity .15s;
+    }
+    .modal-nav:hover:not(:disabled) { background: rgba(99,102,241,.8); color: #fff; }
+    .modal-nav:disabled { opacity: .25; cursor: default; }
+    .modal-nav-prev { left: .6rem; }
+    .modal-nav-next { right: .6rem; }
+    #modal-slideshow.active {
+        background: rgba(99,102,241,.25);
+        border-color: rgba(99,102,241,.5);
+    }
+    .modal-media {
+        max-width: 100%;
+        max-height: 72vh;
+        display: block;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    }
+
+    /* ── Preview zoom ─────────────────────────────────────────────────────
+     * Only the <img> is transformed, so nothing outside the clip box moves.
+     * .modal-view-content is that clip box: a shrink-to-fit flex item, so
+     * zoomIn() in index.js pins it to the image's rendered box in pixels
+     * before cropping. It carries no layout of its own the rest of the time.
+     */
+    .modal-view-content.zoom-viewport { overflow: hidden; border-radius: 8px; }
+    .modal-media.zoomable { cursor: zoom-in; }
+    .modal-media.zoomed {
+        cursor: zoom-out;
+        /* On .zoomed, not .modal-media: transitions read the after-change
+           style, so zooming *in* eases while zooming out snaps back in the
+           same frame the clip box is released — no 160ms of the scaled
+           image spilling over the modal body. */
+        transition: transform .16s ease-out;
+        border-radius: 0;      /* a scaled-up radius reads as a huge bevel */
+        touch-action: none;    /* finger drags pan instead of scrolling .modal-body */
+        will-change: transform;
+    }
+    /* The chevrons sit on top of the image and would swallow the pointer
+       at its left/right edges while zoomed. ← / → still navigate. */
+    #modal-bg.zoom-active .modal-nav { opacity: .15; pointer-events: none; }
+    .modal-footer {
+        padding: .65rem 1rem;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+    .modal-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .25rem;
+        font-size: .8rem;
+    }
+    .modal-tag-label {
+        color: var(--muted);
+        margin-right: .25rem;
+        font-size: .78rem;
+    }
+
+    /* ── MISC ────────────────────────────────────────────────────────────── */
+    #scroll-sentinel {
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: .82rem;
+        grid-column: 1 / -1;
+    }
+
+    .empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 6em 2em;
+        color: var(--muted);
+    }
+    .empty-icon {
+        font-size: 3.5rem;
+        opacity: .18;
+        margin-bottom: .75rem;
+        line-height: 1;
+    }
+    .empty h3 { font-size: 1rem; font-weight: 500; color: var(--text2); margin-bottom: .35rem; }
+    .empty p  { font-size: .85rem; }
+
+    /* Loader ring */
+    .loader {
+        width: 20px; height: 20px;
+        border: 2px solid var(--border2);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin .65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 680px) {
+        .container { padding: 1rem; }
+        .toolbar { padding: .6rem .75rem; }
+        .search-group { flex-wrap: wrap; }
+        .toolbar-actions { flex: 1; }
+        .toolbar-actions .btn { flex: 1; justify-content: center; }
+        .gallery { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
+
+        /* Modal: let the header wrap and shrink so the action buttons
+           never spill past the edge of the screen. */
+        .modal-bg { padding: .75rem; }
+        .modal-header { flex-wrap: wrap; gap: .4rem; padding: .6rem .75rem; }
+        .modal-header-actions { gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
+        .modal-btn { padding: .3rem .55rem; font-size: .76rem; }
+        .modal-body { padding: .6rem; }
+        .modal-media { max-height: 64vh; }
+        .modal-footer { padding: .6rem .75rem; }
+    }

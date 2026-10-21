@@ -1,0 +1,8 @@
+# Lint for real mistakes only — pyflakes (unused imports and variables,
+# undefined names, shadowed imports) plus syntax errors — not style. The
+# code has its own conventions (long SQL lines, aligned comments), and a
+# formatter or pycodestyle pass would churn every file for nothing.
+target-version = "py311"
+
+[lint]
+select = ["F", "E9"]
