@@ -18,7 +18,7 @@ const MEDIA_INDEX = {
           if (show) count++;
       });
       const countEl = document.getElementById('tagCount');
-      if (countEl) countEl.textContent = count + (q ? ' von ' + totalCount : '') + ' Tags';
+      if (countEl) countEl.textContent = count + (q ? ' of ' + totalCount : '') + ' Tags';
   }
 
   // Replaces the inline input handler — this script loads at the end of
