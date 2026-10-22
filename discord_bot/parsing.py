@@ -13,8 +13,8 @@ import urllib.parse
 # Shared with the other bot — see bots_common/parsing.py. Re-exported so
 # callers keep using `parsing.<name>`.
 from bots_common.parsing import (  # noqa: F401
-    extract_urls, format_progress, media_url_info, parse_message_tags,
-    strip_urls,
+    extract_urls, file_ext, format_progress, media_url_info, merge_tags,
+    parse_message_tags, split_tags, strip_urls,
 )
 
 
@@ -80,8 +80,8 @@ def format_tag_links(tags, base_url, limit=1024):
     4096-char embed description); truncation appends an ellipsis.
     """
     parts, total = [], 0
-    for tag in dict.fromkeys(t.strip() for t in (tags or '').split(',')):
-        if not tag or tag.startswith('user:'):
+    for tag in dict.fromkeys(split_tags(tags)):
+        if tag.startswith('user:'):
             continue
         label = tag.replace('[', '').replace(']', '') or tag
         link = (f"[{label}]({base_url}/?search="

@@ -79,7 +79,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in one place, and the admin's user actions look each account up once;
   the two video decodes share one deadline (`ffmpeg.Deadline`), the
   stored item and its announcement one `user:<name>` helper, and logging
-  takes its folder from `LOG_FOLDER`; the database modules lost their
+  takes its folder from `LOG_FOLDER`; the bots share their tag and
+  file-extension helpers, and the upload event carries the item's stored
+  type, which the Discord announcement now reads instead of guessing it
+  from the file name; the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.

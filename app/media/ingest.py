@@ -116,7 +116,7 @@ def ingest_file(tmp_path, ext, tags, uid, is_private, premade_thumb=None,
         event = None
         if not is_private:
             event = build_media_event(final, tpath, fh, full_tags, uid,
-                                      datetime.now().isoformat())
+                                      datetime.now().isoformat(), ftype)
         if is_video and not has_real_thumb:
             # Defer the announcement until the real thumb exists so the
             # bot never posts the placeholder for a video.

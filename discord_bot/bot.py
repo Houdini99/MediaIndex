@@ -838,7 +838,7 @@ class IndexBot(discord.Client):
         the same tags."""
         size_mb = (att.size or 0) / 1e6
         label = f"`{att.filename}`" + (f" ({size_mb:.1f} MB)" if size_mb else "")
-        ext = os.path.splitext(att.filename)[1].lstrip('.').lower()
+        ext = parsing.file_ext(att.filename)
         if ext not in config.ALLOWED_EXT:
             logging.info("ingest: skipping %s (unsupported type)", att.filename)
             if getattr(att, 'path', None):   # yt-dlp temp file, ours to drop
@@ -847,8 +847,7 @@ class IndexBot(discord.Client):
             await self._report(message, f"🚫 {label} — unsupported type")
             return _Outcome(UNSUPPORTED)
         private = self._is_dm(message)
-        base_tags = [t.strip() for t in config.INGEST_TAGS.split(',') if t.strip()]
-        tags = ','.join(dict.fromkeys(list(user_tags) + base_tags))
+        tags = parsing.merge_tags(user_tags, parsing.split_tags(config.INGEST_TAGS))
         # A _LocalSource (yt-dlp) is already on disk; everything else is
         # downloaded first. Either way the temp file is ours to delete.
         local = getattr(att, 'path', None)

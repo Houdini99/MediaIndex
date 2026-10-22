@@ -106,7 +106,7 @@ def test_published_event_matches_what_is_stored(user):
     uid, _username, _password = user
     insert_media('n7.jpg', 'n7.png', SPACED, 'h-norm-7', uid)
     event = build_media_event('n7.jpg', 'n7.png', 'h-norm-7', SPACED,
-                              uid, '2026-07-27T00:00:00')
+                              uid, '2026-07-27T00:00:00', 'image')
     assert event['tags'].split(',') == _stored(_find('h-norm-7'))
 
 

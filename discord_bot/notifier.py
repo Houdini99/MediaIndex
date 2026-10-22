@@ -24,7 +24,13 @@ _TYPE_STYLE = {
 }
 
 
-def _kind(ext):
+def _kind(event):
+    """The item's type: the one the index stored, or — for an event queued
+    by an index from before events carried it — guessed from the file's
+    extension."""
+    if event.get('type') in _TYPE_STYLE:
+        return event['type']
+    ext = parsing.file_ext(event['filepath'])
     if ext == 'gif':
         return 'gif'
     return 'image' if ext in config.IMAGE_EXT else 'video'
@@ -77,8 +83,8 @@ async def notify_loop(client):
 async def _announce(channel, event):
     fname = event['filepath']
     url = f"{config.INDEX_PUBLIC_URL}/media/{fname}"
-    ext = os.path.splitext(fname)[1].lstrip('.').lower()
-    emoji, noun, colour = _TYPE_STYLE[_kind(ext)]
+    kind = _kind(event)
+    emoji, noun, colour = _TYPE_STYLE[kind]
     uploader = event.get('uploaded_by') or 'Unknown'
 
     embed = discord.Embed(title=f"{emoji} New {noun}", url=url,
@@ -112,7 +118,7 @@ async def _announce(channel, event):
     attach = []
     if fits and not config.NOTIFY_THUMBNAIL_ONLY:
         attach.append((media_path, fname))
-        if ext in config.IMAGE_EXT:
+        if kind != 'video':             # an image or a GIF shows inline
             embed.set_image(url=f'attachment://{fname}')
         elif have_thumb:
             # The video renders as its own player under the message; a

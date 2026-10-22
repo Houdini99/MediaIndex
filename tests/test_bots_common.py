@@ -27,7 +27,8 @@ from telegram_bot import parsing as telegram_parsing
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
 SHARED = ('extract_urls', 'strip_urls', 'media_url_info',
-          'parse_message_tags', 'format_progress')
+          'parse_message_tags', 'format_progress', 'split_tags',
+          'merge_tags', 'file_ext')
 
 
 @pytest.mark.parametrize('name', SHARED)
@@ -110,3 +111,28 @@ def test_both_bots_build_from_one_dockerfile():
     dockerfile = (REPO / 'bots_common' / 'Dockerfile').read_text()
     assert dockerfile.count('bgutil-ytdlp-pot-provider==') == 1
     assert dockerfile.count('ARG DENO_VERSION=') == 1
+
+
+def test_split_and_merge_tags():
+    assert common_parsing.split_tags(' cats, ,funny,') == ['cats', 'funny']
+    assert common_parsing.split_tags(None) == []
+    assert common_parsing.merge_tags(['cats', 'tg'], ['tg', 'inbox']) == 'cats,tg,inbox'
+
+
+@pytest.mark.parametrize('name, ext', [
+    ('clip.MP4', 'mp4'), ('a/b/c.tar.gif', 'gif'), ('noext', ''), (None, ''),
+    ('dir.d/noext', ''),
+])
+def test_file_ext(name, ext):
+    assert common_parsing.file_ext(name) == ext
+
+
+@pytest.mark.parametrize('event, kind', [
+    ({'filepath': 'a.png', 'type': 'video'}, 'video'),   # the stored type wins
+    ({'filepath': 'a.gif'}, 'gif'),                      # queued before `type`
+    ({'filepath': 'a.webp', 'type': None}, 'image'),
+    ({'filepath': 'a.mkv', 'type': 'unknown'}, 'video'),
+])
+def test_the_announcement_reads_the_stored_type(event, kind):
+    from discord_bot import notifier
+    assert notifier._kind(event) == kind

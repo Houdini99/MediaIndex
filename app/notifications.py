@@ -25,8 +25,10 @@ def _get_client():
     return _client
 
 
-def build_media_event(filepath, thumb, filehash, tags, uid, upload_date):
-    """Assemble a media_added payload, or None on any failure.
+def build_media_event(filepath, thumb, filehash, tags, uid, upload_date, ftype):
+    """Assemble a media_added payload, or None on any failure. `ftype` is
+    the stored type (image/gif/video), so the bot need not guess it from
+    the file name.
 
     `tags` should be the same string handed to insert_media(); the
     user:<name> tag is added here the same way insert_media adds it.
@@ -46,6 +48,7 @@ def build_media_event(filepath, thumb, filehash, tags, uid, upload_date):
             'thumb': os.path.basename(thumb) if thumb else None,
             'filehash': filehash,
             'tags': tags,
+            'type': ftype,
             'uploaded_by': uname or 'Unknown',
             'upload_date': upload_date,
         }

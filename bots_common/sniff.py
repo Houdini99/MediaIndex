@@ -27,6 +27,8 @@ import urllib.parse
 
 import aiohttp
 
+from .parsing import file_ext
+
 #: Redirect hops followed before giving up. Each one is re-checked, since
 #: a public URL that 302s to 127.0.0.1 is the obvious way around a check
 #: that only looked at what the user typed.
@@ -100,10 +102,6 @@ def _disposition_name(value):
     return posixpath.basename(urllib.parse.unquote(name).replace('\\', '/'))
 
 
-def _ext(name):
-    return name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-
-
 def media_name(url, headers, allowed_ext):
     """The filename to ingest a response as, or None when it isn't media
     the index takes.
@@ -116,7 +114,7 @@ def media_name(url, headers, allowed_ext):
     ctype = (headers.get('Content-Type') or '').split(';')[0].strip().lower()
     is_media = ctype.startswith(('video/', 'image/'))
     offered = _disposition_name(headers.get('Content-Disposition'))
-    if offered and _ext(offered) in allowed_ext \
+    if offered and file_ext(offered) in allowed_ext \
             and (is_media or ctype == 'application/octet-stream'):
         return offered
     if not is_media:

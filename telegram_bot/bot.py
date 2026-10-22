@@ -50,7 +50,7 @@ logging.basicConfig(
 # seconds buries everything this bot actually says.
 logging.getLogger('httpx').setLevel(logging.WARNING)
 
-BASE_TAGS = parsing.split_base_tags(config.INGEST_TAGS)
+BASE_TAGS = parsing.split_tags(config.INGEST_TAGS)
 
 
 class _Item:
@@ -315,12 +315,15 @@ class IndexBot:
             for item in items:
                 await self._ingest(message, item, tags, owner, private, context)
             return
+        if len(items) > 1:
+            what, it, only = f'these {len(items)} files', 'them', 'these'
+        else:
+            what, it, only = 'this', 'it', 'it'
         prompt = await self._reply(
             message,
-            f"🏷️ Send tags for {'these ' + str(len(items)) + ' files' if len(items) > 1 else 'this'} "
-            f"and I'll index {'them' if len(items) > 1 else 'it'} "
+            f"🏷️ Send tags for {what} and I'll index {it} "
             f"— e.g. <code>cats,funny</code>.\n"
-            f"Reply to this message to tag only {'these' if len(items) > 1 else 'it'}, "
+            f"Reply to this message to tag only {only}, "
             f"or just send a tag list to tag everything you have waiting.")
         prompt_id = prompt.message_id if prompt else None
         for item in items:

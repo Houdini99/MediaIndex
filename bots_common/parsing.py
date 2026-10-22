@@ -1,5 +1,6 @@
 """Message parsing shared by both bots: links out of message text, tag
-lists out of captions, direct-media URLs, and the download progress line.
+lists out of captions, direct-media URLs, tag and extension helpers, and
+the download progress line.
 
 Pure stdlib so it stays unit-testable without discord.py or any Telegram
 library installed. Each bot's own parsing module re-exports these next to
@@ -20,6 +21,31 @@ _URL_RE = re.compile(r'https?://[^\s<>]+')
 # instead of after a wasted download and upload.
 IMAGE_EXT = frozenset({'jpg', 'jpeg', 'png', 'webp', 'gif'})
 ALLOWED_EXT = IMAGE_EXT | {'mp4', 'webm', 'avi', 'mov', 'mkv'}
+
+
+def split_tags(raw):
+    """A comma-separated tag string (a caption, a stored tag string, an
+    INGEST_TAGS value) → its stripped, non-empty tags."""
+    return [t.strip() for t in (raw or '').split(',') if t.strip()]
+
+
+def merge_tags(caption_tags, base_tags):
+    """Final comma-separated tag string for one item.
+
+    Caption tags first, then the configured base tags, deduped while
+    keeping order — `dict.fromkeys` rather than a set, because tag order
+    is what the user sees back in the gallery. The index normalizes the
+    result again on the way in, so this does not try to enforce the
+    stored-format invariant itself.
+    """
+    return ','.join(dict.fromkeys(list(caption_tags) + list(base_tags)))
+
+
+def file_ext(filename, fallback=''):
+    """Lowercase extension of a file name (or the last part of a path),
+    without the dot."""
+    name = (filename or '').rsplit('/', 1)[-1]
+    return name.rsplit('.', 1)[-1].lower() if '.' in name else fallback
 
 
 def extract_urls(text):
@@ -82,8 +108,7 @@ def media_url_info(url, allowed_ext):
     if parts.scheme not in ('http', 'https'):
         return None
     name = urllib.parse.unquote(posixpath.basename(parts.path))
-    ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-    if ext in allowed_ext:
+    if file_ext(name) in allowed_ext:
         return name
     fmt = urllib.parse.parse_qs(parts.query).get('format', [''])[0].lower()
     if fmt in allowed_ext:
@@ -107,7 +132,7 @@ def parse_message_tags(content, max_tags=20, max_tag_len=50):
         return []
     if ',' not in text and ' ' in text:
         return []
-    tags = [t.strip() for t in text.split(',') if t.strip()]
+    tags = split_tags(text)
     if not tags or len(tags) > max_tags or any(len(t) > max_tag_len for t in tags):
         return []
     return tags

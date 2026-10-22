@@ -71,6 +71,7 @@ def test_public_upload_publishes_event(client, logged_in, user, fake_redis):
     assert event['filepath'] == fp
     assert event['thumb'] == th
     assert event['uploaded_by'] == user[1]
+    assert event['type'] == 'image'
     assert 'test' in event['tags'] and f'user:{user[1]}' in event['tags']
 
 
