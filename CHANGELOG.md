@@ -59,9 +59,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   wrapper around the yt-dlp download (`resolver.resolve_async()`), and
   the app one helper each for decrypting a private file, parsing id lists
   and checking the bots' API accounts; the database modules lost their
-  wrapper and set-up functions, and the staging queue's, duplicate
-  finder's and accounts' queries their hand-made cursors and commits; the
-  pages share one header, one set of card and button styles, and the
+  wrapper and set-up functions and their hand-made cursors and commits;
+  the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.
 
 ### Fixed

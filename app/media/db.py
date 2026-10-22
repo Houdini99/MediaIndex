@@ -47,10 +47,9 @@ def get_username_by_id(uid):
         return None
     try:
         with db_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT username FROM users.users WHERE id=%s", (uid,))
-            row = cur.fetchone()
-            return row[0] if row else None
+            row = conn.execute("SELECT username FROM users.users WHERE id=%s",
+                               (uid,)).fetchone()
+        return row[0] if row else None
     except Exception as e:
         logging.warning("get_username_by_id failed for uid=%s: %s", uid, e)
         return None
@@ -61,10 +60,9 @@ def get_user_id_by_username(username):
         return None
     try:
         with db_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT id FROM users.users WHERE username=%s", (username,))
-            row = cur.fetchone()
-            return row[0] if row else None
+            row = conn.execute("SELECT id FROM users.users WHERE username=%s",
+                               (username,)).fetchone()
+        return row[0] if row else None
     except Exception as e:
         logging.warning("get_user_id_by_username failed for %r: %s", username, e)
         return None
@@ -76,10 +74,9 @@ def get_usernames_for_media(data):
         return {}
     try:
         with db_conn() as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT id, username FROM users.users WHERE id = ANY(%s)",
-                        (list(ids),))
-            return {uid: name for uid, name in cur.fetchall()}
+            rows = conn.execute("SELECT id, username FROM users.users WHERE id = ANY(%s)",
+                                (list(ids),)).fetchall()
+        return {uid: name for uid, name in rows}
     except Exception as e:
         logging.warning("get_usernames_for_media failed: %s", e)
         return {}
@@ -139,13 +136,11 @@ def _build_where(ft, search, exclude_tags, include_tags=None, viewer_id=None, pr
 # ── Read queries ───────────────────────────────────────────────────────────
 def get_media_count(ft=None, search=None, exclude_tags=None, include_tags=None, viewer_id=None, private_only=False):
     conds, params = _build_where(ft, search, exclude_tags, include_tags, viewer_id, private_only)
+    q = "SELECT COUNT(*) FROM media.media"
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
     with db_conn() as conn:
-        cur = conn.cursor()
-        q = "SELECT COUNT(*) FROM media.media"
-        if conds:
-            q += " WHERE " + " AND ".join(conds)
-        cur.execute(q, params)
-        return cur.fetchone()[0]
+        return conn.execute(q, params).fetchone()[0]
 
 
 def get_media(ft=None, search=None, exclude_tags=None, page=1, include_tags=None, viewer_id=None, private_only=False, sort='newest', sort_seed=0):
@@ -184,13 +179,12 @@ def get_media(ft=None, search=None, exclude_tags=None, page=1, include_tags=None
 
 def get_media_ids(ft=None, search=None, exclude_tags=None, include_tags=None, viewer_id=None):
     conds, params = _build_where(ft, search, exclude_tags, include_tags, viewer_id)
+    q = "SELECT id FROM media.media"
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
     with db_conn() as conn:
-        cur = conn.cursor()
-        q = "SELECT id FROM media.media"
-        if conds:
-            q += " WHERE " + " AND ".join(conds)
-        cur.execute(q, params)
-        return [r[0] for r in cur.fetchall()]
+        rows = conn.execute(q, params).fetchall()
+    return [r[0] for r in rows]
 
 
 def get_media_by_ids(ids, viewer_id=None):
@@ -231,35 +225,29 @@ def get_privacy_for_file(fname):
     if not fname:
         return None
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT uploaded_by, is_private FROM media.media "
             "WHERE filepath = %s OR thumb = %s LIMIT 1",
-            (fname, fname))
-        return cur.fetchone()
+            (fname, fname)).fetchone()
 
 
 def get_media_privacy_state(mid):
     """Return (filepath, thumb, uploaded_by, is_private) for one row, or
     None — used by the privacy flip in ingest.set_media_privacy."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT filepath, thumb, uploaded_by, is_private "
             "FROM media.media WHERE id=%s",
-            (mid,))
-        return cur.fetchone()
+            (mid,)).fetchone()
 
 
 def set_media_paths_privacy(mid, filepath, thumb, is_private):
     """Store the renamed file/thumb names and the privacy flag after an
     encrypt/decrypt flip (see ingest.set_media_privacy)."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        cur = conn.execute(
             "UPDATE media.media SET filepath=%s, thumb=%s, is_private=%s WHERE id=%s",
             (filepath, thumb, bool(is_private), mid))
-        conn.commit()
         return cur.rowcount > 0
 
 
@@ -273,10 +261,8 @@ def replace_thumb(old_thumb, new_thumb):
     so the old name identifies exactly one row. Returns True when repointed.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("UPDATE media.media SET thumb=%s WHERE thumb=%s",
-                    (os.path.basename(new_thumb), os.path.basename(old_thumb)))
-        conn.commit()
+        cur = conn.execute("UPDATE media.media SET thumb=%s WHERE thumb=%s",
+                           (os.path.basename(new_thumb), os.path.basename(old_thumb)))
         return cur.rowcount > 0
 
 
@@ -284,20 +270,16 @@ def get_image_rows():
     """(id, filepath, thumb, uploaded_by, is_private) for every still-image
     row — the candidates for app.media.thumb_repair."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT id, filepath, thumb, uploaded_by, is_private "
-            "FROM media.media WHERE ftype = 'image' ORDER BY id")
-        return cur.fetchall()
+            "FROM media.media WHERE ftype = 'image' ORDER BY id").fetchall()
 
 
 def get_all_media_paths():
     """Return (id, filepath, thumb) for every media row — used by the
     admin integrity check."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT id, filepath, thumb FROM media.media")
-        return cur.fetchall()
+        return conn.execute("SELECT id, filepath, thumb FROM media.media").fetchall()
 
 
 def delete_media_rows(ids):
@@ -306,17 +288,15 @@ def delete_media_rows(ids):
     if not ids:
         return 0
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM media.media WHERE id = ANY(%s)", (list(ids),))
-        conn.commit()
-        return cur.rowcount
+        return conn.execute("DELETE FROM media.media WHERE id = ANY(%s)",
+                            (list(ids),)).rowcount
 
 
 def hash_exists(fh):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT id FROM media.media WHERE filehash=%s", (fh,))
-        return cur.fetchone() is not None
+        row = conn.execute("SELECT id FROM media.media WHERE filehash=%s",
+                           (fh,)).fetchone()
+    return row is not None
 
 
 def get_media_by_hash(fh):
@@ -329,12 +309,10 @@ def get_media_by_hash(fh):
     if not fh:
         return None
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT id, filepath, thumb, tags, uploaded_by, is_private "
             "FROM media.media WHERE filehash=%s LIMIT 1",
-            (fh,))
-        return cur.fetchone()
+            (fh,)).fetchone()
 
 
 def get_tag_statistics(viewer_id=None):
@@ -373,9 +351,8 @@ def get_tag_statistics(viewer_id=None):
         sql = sql.format(visibility="")
 
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(sql, params)
-        return [(tag, count) for tag, count in cur.fetchall()]
+        rows = conn.execute(sql, params).fetchall()
+    return [(tag, count) for tag, count in rows]
 
 
 # ── Write queries ──────────────────────────────────────────────────────────
@@ -387,7 +364,6 @@ def insert_media(fp, th, tags, fh, uid, is_private=False):
     duplicate path is exercised constantly by the Discord bot's dedup.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
         udate = db_now()
         uname = get_username_by_id(uid)
         # Normalized at the write boundary, not at the callers. Every read
@@ -411,32 +387,29 @@ def insert_media(fp, th, tags, fh, uid, is_private=False):
         from .processing import file_type
         from .crypto import strip_enc
         base = strip_enc(os.path.basename(fp))
-        cur.execute(
+        row = conn.execute(
             "INSERT INTO media.media (filepath,thumb,tags,filehash,uploaded_by,upload_date,is_private,ftype) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (filehash) DO NOTHING RETURNING id",
             (os.path.basename(fp), os.path.basename(th) if th else th,
-             tags, fh, uid, udate, bool(is_private), file_type(base)))
-        inserted = cur.fetchone() is not None
-        conn.commit()
-        return inserted
+             tags, fh, uid, udate, bool(is_private), file_type(base))).fetchone()
+        return row is not None
 
 
 def delete_media(mid, user_id, is_admin=False):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT filepath,thumb,uploaded_by FROM media.media WHERE id=%s",
-                    (mid,))
-        row = cur.fetchone()
+        row = conn.execute(
+            "SELECT filepath,thumb,uploaded_by FROM media.media WHERE id=%s",
+            (mid,)).fetchone()
         if not row:
             return False
         if row[2] != user_id and not is_admin:
             return False
-        # Row first, files second. The other way round, a failed DELETE left
-        # a row pointing at files that were already gone — a broken gallery
-        # item. This way the worst case is an orphaned file, which the
-        # admin integrity check finds and cleans up.
-        cur.execute("DELETE FROM media.media WHERE id=%s", (mid,))
-        conn.commit()
+        # Row first, files second: the block commits the DELETE as it ends,
+        # before the files below are touched. The other way round, a failed
+        # DELETE left a row pointing at files that were already gone — a
+        # broken gallery item. This way the worst case is an orphaned file,
+        # which the admin integrity check finds and cleans up.
+        conn.execute("DELETE FROM media.media WHERE id=%s", (mid,))
     # Resolve against the configured folders so legacy relative/absolute
     # stored paths still delete the real file (same pattern as serving).
     _remove_files(row[0], row[1])
@@ -469,15 +442,14 @@ def _rewrite_tags(match_tag, transform, dry_run=False):
     (media_id, old_tags_str, new_tags_str) tuples.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
         if match_tag is None:
-            cur.execute("SELECT id, tags FROM media.media WHERE tags IS NOT NULL")
+            rows = conn.execute(
+                "SELECT id, tags FROM media.media WHERE tags IS NOT NULL").fetchall()
         else:
-            cur.execute(
+            rows = conn.execute(
                 "SELECT id, tags FROM media.media "
                 "WHERE (',' || tags || ',') ILIKE %s ESCAPE '\\'",
-                (f"%,{like_escape(match_tag)},%",))
-        rows = cur.fetchall()
+                (f"%,{like_escape(match_tag)},%",)).fetchall()
 
         changes = []
         for mid, tags_str in rows:
@@ -485,12 +457,9 @@ def _rewrite_tags(match_tag, transform, dry_run=False):
             if new_tags_str == tags_str:
                 continue
             if not dry_run:
-                cur.execute("UPDATE media.media SET tags=%s WHERE id=%s",
-                            (new_tags_str, mid))
+                conn.execute("UPDATE media.media SET tags=%s WHERE id=%s",
+                             (new_tags_str, mid))
             changes.append((mid, tags_str, new_tags_str))
-
-        if not dry_run:
-            conn.commit()
     return len(changes), changes
 
 
@@ -548,11 +517,9 @@ def bulk_edit_tags(ids, add_tags, remove_tags, user_id, is_admin=False):
     remove = set(remove_tags)
     updated = failed = 0
     with db_conn() as conn:
-        cur = conn.cursor()
         for mid in ids:
-            cur.execute("SELECT tags, uploaded_by FROM media.media WHERE id=%s",
-                        (mid,))
-            row = cur.fetchone()
+            row = conn.execute("SELECT tags, uploaded_by FROM media.media WHERE id=%s",
+                               (mid,)).fetchone()
             if not row or (row[1] != user_id and not is_admin):
                 failed += 1
                 continue
@@ -561,10 +528,9 @@ def bulk_edit_tags(ids, add_tags, remove_tags, user_id, is_admin=False):
             merged = kept + [t for t in add_tags if t not in kept]
             new_tags_str = tag_str(merged)
             if new_tags_str != (row[0] or ''):
-                cur.execute("UPDATE media.media SET tags=%s WHERE id=%s",
-                            (new_tags_str, mid))
+                conn.execute("UPDATE media.media SET tags=%s WHERE id=%s",
+                             (new_tags_str, mid))
             updated += 1
-        conn.commit()
     return updated, failed
 
 
@@ -575,15 +541,16 @@ def update_media_tags(mid, new_tags, user_id, is_admin=False):
     # tag_str(...).
     new_tags = tag_str(tag_list(new_tags))
     with db_conn() as conn:
-        cur = conn.cursor()
         try:
             if is_admin:
-                cur.execute("UPDATE media.media SET tags=%s WHERE id=%s",
-                            (new_tags, mid))
+                cur = conn.execute("UPDATE media.media SET tags=%s WHERE id=%s",
+                                   (new_tags, mid))
             else:
-                cur.execute(
+                cur = conn.execute(
                     "UPDATE media.media SET tags=%s WHERE id=%s AND uploaded_by=%s",
                     (new_tags, mid, user_id))
+            # Committed here, not when the block ends, so that a failing
+            # commit also lands in the handler below.
             conn.commit()
             return cur.rowcount > 0
         except Exception:
@@ -597,11 +564,9 @@ def update_media_tags(mid, new_tags, user_id, is_admin=False):
 def get_media_owned_by(uid):
     """Return (id, filepath, thumb, is_private) for every row uploaded by `uid`."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT id, filepath, thumb, is_private FROM media.media "
-            "WHERE uploaded_by=%s", (uid,))
-        return cur.fetchall()
+            "WHERE uploaded_by=%s", (uid,)).fetchall()
 
 
 def reassign_media_owner(old_uid, new_uid):
@@ -611,11 +576,9 @@ def reassign_media_owner(old_uid, new_uid):
     files can only be decrypted with the original owner's key.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("UPDATE media.media SET uploaded_by=%s WHERE uploaded_by=%s",
-                    (new_uid, old_uid))
-        conn.commit()
-        return cur.rowcount
+        return conn.execute(
+            "UPDATE media.media SET uploaded_by=%s WHERE uploaded_by=%s",
+            (new_uid, old_uid)).rowcount
 
 
 def delete_media_for_user(uid):
