@@ -6,6 +6,28 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-22
+
+A maintenance release from a full code audit. The Discord bot now checks
+every link it downloads, both bots behave and word their messages the
+same way, and a number of small bugs are fixed. Most of the work is
+behind the scenes: the two bots share one download path, settings reader,
+index client and yt-dlp wrapper, and the app lost its duplicated helpers,
+stylesheets and dead code. The test suite grew from 954 to 1120 tests
+along the way.
+
+### Upgrading from 1.0.0
+
+- Rebuild all three images with `./build.sh`. The bots now build from one
+  Dockerfile, `bots_common/Dockerfile`; a stack that builds the bot images
+  itself instead needs the change described under *Changed*.
+- No database migration is needed. A database from before 1.0.0 has to
+  run 1.0.0 once first (see *Removed*).
+- Optional: drop `FLASK_APP` from your compose file, and set
+  `DISCORD_LINK_MAX_MB` if 512 MB is not the limit you want.
+- `DISCORD_LOG_CHANNEL_ID`, when set, has to be a number now.
+- The tag scripts are now `scripts/tags.py rename|remove|normalize`.
+
 ### Added
 
 - `DISCORD_LINK_MAX_MB` (default 512): the size limit for a file the
@@ -61,37 +83,38 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A `DISCORD_LOG_CHANNEL_ID` that is not a number now stops the Discord
   bot at startup with a message naming the variable, like the bots' other
   number settings. Before, it turned the log channel off without a word.
-- Code clean-up from an audit, with no change in behaviour: dead code
-  removed; the bots share one download path (one downloader class, and
-  one redirect walker that checks every hop), one module that reads
-  their settings (`bots_common/env.py`), one client for the index's API
-  with the account-link cache (`bots_common/index_client.py`) and one
-  wrapper around the yt-dlp download (`resolver.resolve_async()`), and
-  the app one helper each for decrypting a private file, parsing id lists,
-  checking the bots' API accounts and checking an app password (WebDAV
-  and the upload API), and one place for the minimum password length
-  (the forms, their inputs and `set_password.py`); logging out leaves
-  deleting the session cookie to Flask; the gallery page and its API
-  read their filters in one place, and a private file is served after
-  one database lookup instead of two; files are deleted through one
-  helper (`app/files.py`), with one function each for a media item's
-  files and a staged thumbnail; the duplicate finder reads its settings
-  in one place, and the admin's user actions look each account up once;
-  the two video decodes share one deadline (`ffmpeg.Deadline`), the
-  stored item and its announcement one `user:<name>` helper, and logging
-  takes its folder from `LOG_FOLDER`; the bots share their tag and
-  file-extension helpers, and the upload event carries the item's stored
-  type, which the Discord announcement now reads instead of guessing it
-  from the file name; the link resolver's download step handles its
-  first try and its impersonated retry in one loop; the gallery lightbox
-  and the feed share one click-to-zoom (`MI.zoom` in `common.js`), the
-  lightbox deletes through the card's delete and uses the media URL the
-  server sends, and the gallery's two card builders (the first page's
-  template and the cards loaded while scrolling) match again, down to
-  "No tags" and "Edit tags"; the database modules lost their
-  wrapper and set-up functions and their hand-made cursors and commits;
-  the pages share one header, one set of card and button styles, and the
-  sign-in pages one layout.
+- Code clean-up from the audit, with no change in behaviour:
+  - Bots: one download path (one downloader class, and one redirect
+    walker that checks every hop), one module that reads their settings
+    (`bots_common/env.py`), one client for the index's API with the
+    account-link cache (`bots_common/index_client.py`), one wrapper
+    around the yt-dlp download (`resolver.resolve_async()`), whose
+    download step runs its first try and its impersonated retry in one
+    loop, and shared tag and file-extension helpers. The upload event
+    carries the item's stored type, which the Discord announcement reads
+    instead of guessing it from the file name.
+  - App: one helper each for decrypting a private file, parsing id
+    lists, checking the bots' API accounts, checking an app password
+    (WebDAV and the upload API) and deleting files (`app/files.py`); one
+    place for the minimum password length (the forms, their inputs and
+    `set_password.py`); one reader for the gallery's filters, shared by
+    the page and its API, and one for the duplicate finder's settings;
+    one deadline for the two video decodes (`ffmpeg.Deadline`) and one
+    `user:<name>` helper for the stored item and its announcement.
+    Logging takes its folder from `LOG_FOLDER`, and logging out leaves
+    deleting the session cookie to Flask.
+  - Database: the modules lost their wrapper and set-up functions and
+    their hand-made cursors and commits; a private file is served after
+    one lookup instead of two, and the admin's user actions look each
+    account up once.
+  - Front end: the pages share one header, one set of card and button
+    styles, and the sign-in pages one layout; the gallery lightbox and
+    the feed share one click-to-zoom (`MI.zoom` in `common.js`); the
+    lightbox deletes through the card's delete and uses the media URL
+    the server sends; the gallery's two card builders (the first page's
+    template and the cards loaded while scrolling) match again, down to
+    "No tags" and "Edit tags".
+  - Dead code removed.
 
 ### Removed
 
@@ -235,5 +258,6 @@ a network folder, Discord and Telegram.
 
 See [Security model](docs/security.md#known-limitations) for details.
 
-[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Houdini99/MediaIndex/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Houdini99/MediaIndex/releases/tag/v1.0.0
