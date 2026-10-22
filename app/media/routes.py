@@ -46,6 +46,7 @@ from ..auth.db import (
 from ..auth.routes import login_required
 from ..config import Config
 from ..extensions import csrf, limiter
+from ..request_parsing import json_ids
 from .. import site_logins
 from ..security_log import failed_login
 
@@ -309,26 +310,32 @@ def delete(media_id):
     return redirect(url_for('media.index'))
 
 
+def _bad_ids():
+    """The bulk actions' answer to a body without a usable `ids` list."""
+    return jsonify({'error': 'ids must be a non-empty list of integers'}), 400
+
+
+def _files(n):
+    """'1 file' / '3 files', for the bulk actions' flash messages."""
+    return f"{n} file{'s' if n != 1 else ''}"
+
+
 @media_bp.route('/delete-bulk', methods=['POST'])
 @login_required
 def delete_bulk():
     data = request.get_json(silent=True) or {}
-    ids = data.get('ids')
-    if not isinstance(ids, list) or not ids:
-        return jsonify({'error': 'ids must be a non-empty list'}), 400
-    try:
-        ids = [int(i) for i in ids[:500]]
-    except (ValueError, TypeError):
-        return jsonify({'error': 'ids must be integers'}), 400
+    ids = json_ids(data, 'ids')
+    if ids is None:
+        return _bad_ids()
     deleted = sum(
         1 for mid in ids
         if delete_media(mid, g.user['id'], is_admin=g.user['is_admin'])
     )
     failed = len(ids) - deleted
     if deleted:
-        flash(f"✅ {deleted} file{'s' if deleted != 1 else ''} deleted.", "success")
+        flash(f"✅ {_files(deleted)} deleted.", "success")
     if failed:
-        flash(f"❌ {failed} file{'s' if failed != 1 else ''} could not be deleted.", "danger")
+        flash(f"❌ {_files(failed)} could not be deleted.", "danger")
     return jsonify({'deleted': deleted, 'failed': failed})
 
 
@@ -336,13 +343,9 @@ def delete_bulk():
 @login_required
 def privacy_bulk():
     data = request.get_json(silent=True) or {}
-    ids = data.get('ids')
-    if not isinstance(ids, list) or not ids:
-        return jsonify({'error': 'ids must be a non-empty list'}), 400
-    try:
-        ids = [int(i) for i in ids[:500]]
-    except (ValueError, TypeError):
-        return jsonify({'error': 'ids must be integers'}), 400
+    ids = json_ids(data, 'ids')
+    if ids is None:
+        return _bad_ids()
     private = data.get('private')
     if not isinstance(private, bool):
         return jsonify({'error': 'private must be a boolean'}), 400
@@ -353,9 +356,9 @@ def privacy_bulk():
     failed = len(ids) - updated
     word = 'private' if private else 'public'
     if updated:
-        flash(f"✅ {updated} file{'s' if updated != 1 else ''} made {word}.", "success")
+        flash(f"✅ {_files(updated)} made {word}.", "success")
     if failed:
-        flash(f"❌ {failed} file{'s' if failed != 1 else ''} could not be made {word}.", "danger")
+        flash(f"❌ {_files(failed)} could not be made {word}.", "danger")
     return jsonify({'updated': updated, 'failed': failed})
 
 
@@ -363,13 +366,9 @@ def privacy_bulk():
 @login_required
 def edit_bulk():
     data = request.get_json(silent=True) or {}
-    ids = data.get('ids')
-    if not isinstance(ids, list) or not ids:
-        return jsonify({'error': 'ids must be a non-empty list'}), 400
-    try:
-        ids = [int(i) for i in ids[:500]]
-    except (ValueError, TypeError):
-        return jsonify({'error': 'ids must be integers'}), 400
+    ids = json_ids(data, 'ids')
+    if ids is None:
+        return _bad_ids()
 
     def _tag_field(key):
         """Parsed tags from a JSON string field, or None if it isn't one."""
@@ -385,9 +384,9 @@ def edit_bulk():
         return jsonify({'error': 'nothing to change'}), 400
     updated, failed = bulk_edit_tags(ids, add, remove, g.user['id'], is_admin=g.user['is_admin'])
     if updated:
-        flash(f"✅ Tags updated on {updated} file{'s' if updated != 1 else ''}.", "success")
+        flash(f"✅ Tags updated on {_files(updated)}.", "success")
     if failed:
-        flash(f"❌ {failed} file{'s' if failed != 1 else ''} could not be updated.", "danger")
+        flash(f"❌ {_files(failed)} could not be updated.", "danger")
     return jsonify({'updated': updated, 'failed': failed})
 
 
@@ -605,8 +604,7 @@ def api_upload():
     """
     user = _api_user()
     if user is None:
-        return jsonify({'error': 'authentication required'}), 401, {
-            'WWW-Authenticate': 'Basic realm="MediaIndex API"'}
+        return _unauthenticated()
     files = request.files.getlist('file') or request.files.getlist('files')
     if not files:
         return jsonify({'error': 'no file in the request'}), 400
@@ -663,12 +661,9 @@ def api_telegram_user():
     nobody's business but the bot's. An ordinary account with a WebDAV app
     password gets 403.
     """
-    user = _api_user()
-    if user is None:
-        return jsonify({'error': 'authentication required'}), 401, {
-            'WWW-Authenticate': 'Basic realm="MediaIndex API"'}
-    if user['username'] not in Config.DELEGATED_UPLOADERS:
-        return jsonify({'error': 'not permitted'}), 403
+    refused = _refuse_non_delegated()
+    if refused:
+        return refused
     raw_id = (request.args.get('telegram_id') or '').strip()
     try:
         telegram_id = int(raw_id) if raw_id else None
@@ -822,13 +817,18 @@ def api_site_login_rotate(platform_id):
     return jsonify({'revision': new_revision})
 
 
+def _unauthenticated():
+    """The 401 for an API request without valid Basic credentials."""
+    return jsonify({'error': 'authentication required'}), 401, {
+        'WWW-Authenticate': 'Basic realm="MediaIndex API"'}
+
+
 def _refuse_non_delegated():
     """The error response for a caller that is not a DELEGATED_UPLOADERS
     account authenticated by app password, or None to go ahead."""
     user = _api_user()
     if user is None:
-        return jsonify({'error': 'authentication required'}), 401, {
-            'WWW-Authenticate': 'Basic realm="MediaIndex API"'}
+        return _unauthenticated()
     if user['username'] not in Config.DELEGATED_UPLOADERS:
         return jsonify({'error': 'not permitted'}), 403
     return None

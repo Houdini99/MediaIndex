@@ -597,6 +597,35 @@ def test_export_csv_lists_every_group_member(admin_client, admin):
     assert len(body.strip().splitlines()) == 3  # header + two members
 
 
+def test_quarantine_routes_act_on_the_ticked_items_only(admin_client, admin):
+    """Restore and purge take either 'all' or the ticked ids, and a form
+    with nothing ticked changes nothing."""
+    uid = admin[0]
+    original = _gradient()
+    keeper = _add_media(uid, 'a', original)
+    one = _add_media(uid, 'b', original.copy())
+    two = _add_media(uid, 'c', original.copy())
+    _run_scan(uid)
+    dupes.quarantine_group(keeper, [one, two], False, uid)
+
+    def quarantined():
+        return {row[0] for row in dupes_db.fetch_quarantine()}
+
+    for action in ('restore', 'purge'):
+        resp = admin_client.post(f'/admin/duplicates/quarantine/{action}',
+                                 data={}, follow_redirects=True)
+        assert b'Nothing selected.' in resp.data
+    assert quarantined() == {one, two}
+
+    admin_client.post('/admin/duplicates/quarantine/restore',
+                      data={'media_id': str(one)})
+    assert quarantined() == {two}
+    admin_client.post('/admin/duplicates/quarantine/purge',
+                      data={'media_id': str(two)})
+    assert quarantined() == set()
+    assert get_media_by_id(one) is not None and get_media_by_id(two) is None
+
+
 def test_purge_route_deletes_quarantined_items(admin_client, admin):
     uid = admin[0]
     original = _gradient()

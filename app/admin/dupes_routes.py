@@ -25,6 +25,7 @@ from ..media.dupes_db import (
     fetch_quarantine,
     quarantine_summary,
 )
+from ..request_parsing import json_ids
 
 
 # The page renders the shell (scan form, quarantine, dismissed pairs); the
@@ -47,15 +48,12 @@ def _dupe_params():
     })
 
 
-def _json_ids(data, key, limit=500):
-    """Validated list of media ids from a JSON body, or None."""
-    ids = data.get(key)
-    if not isinstance(ids, list) or not ids:
+def _quarantine_selection():
+    """The media ids a quarantine form names: None for its "all" button,
+    otherwise the ticked ids (an empty list when nothing was ticked)."""
+    if request.form.get('all') == '1':
         return None
-    try:
-        return [int(i) for i in ids[:limit]]
-    except (TypeError, ValueError):
-        return None
+    return [int(i) for i in request.form.getlist('media_id') if i.isdigit()]
 
 
 @admin_bp.route('/duplicates')
@@ -164,7 +162,7 @@ def duplicates_groups():
 @admin_required
 def duplicates_resolve():
     data = request.get_json(silent=True) or {}
-    ids = _json_ids(data, 'ids')
+    ids = json_ids(data, 'ids')
     try:
         keep_id = int(data.get('keep_id'))
     except (TypeError, ValueError):
@@ -202,7 +200,7 @@ def duplicates_resolve_all():
 @admin_required
 def duplicates_dismiss():
     data = request.get_json(silent=True) or {}
-    ids = _json_ids(data, 'ids')
+    ids = json_ids(data, 'ids')
     if not ids or len(ids) < 2:
         return jsonify({'error': 'at least two ids are required'}), 400
     return jsonify({'dismissed': dupes.dismiss_group(ids, g.user['id'])})
@@ -228,13 +226,10 @@ def duplicates_undismiss():
 @admin_bp.route('/duplicates/quarantine/restore', methods=('POST',))
 @admin_required
 def duplicates_quarantine_restore():
-    if request.form.get('all') == '1':
-        ids = None
-    else:
-        ids = [int(i) for i in request.form.getlist('media_id') if i.isdigit()]
-        if not ids:
-            flash('Nothing selected.', 'warning')
-            return redirect(url_for('admin.duplicates'))
+    ids = _quarantine_selection()
+    if ids == []:
+        flash('Nothing selected.', 'warning')
+        return redirect(url_for('admin.duplicates'))
     n = dupes.restore_quarantine(ids, g.user['id'])
     flash(f'{n} item(s) restored; their original tags are back.', 'success')
     return redirect(url_for('admin.duplicates'))
@@ -244,13 +239,10 @@ def duplicates_quarantine_restore():
 @admin_required
 def duplicates_quarantine_purge():
     """Step two of the resolve — this is the only destructive action here."""
-    if request.form.get('all') == '1':
-        ids = None
-    else:
-        ids = [int(i) for i in request.form.getlist('media_id') if i.isdigit()]
-        if not ids:
-            flash('Nothing selected.', 'warning')
-            return redirect(url_for('admin.duplicates'))
+    ids = _quarantine_selection()
+    if ids == []:
+        flash('Nothing selected.', 'warning')
+        return redirect(url_for('admin.duplicates'))
     deleted, failed, freed = dupes.purge_quarantine(ids, g.user['id'])
     if deleted:
         flash(f'{deleted} item(s) permanently deleted — {human_size(freed)} freed.',
