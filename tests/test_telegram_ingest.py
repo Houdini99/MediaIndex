@@ -23,9 +23,9 @@ import pytest
 from redis.exceptions import ResponseError
 from telegram.error import TelegramError
 
+from bots_common.index_client import IndexUnavailable
 from telegram_bot import config
 from telegram_bot.bot import IndexBot, extract_item
-from telegram_bot.index_client import IndexUnavailable
 from telegram_bot.pending import PendingStore
 
 
@@ -317,12 +317,6 @@ def test_the_unlinked_notice_is_throttled(bot, ctx):
     run(bot.on_media(FakeUpdate(second), ctx))
     assert len(first.replies) == 1
     assert second.replies == [], "a stranger must not make the bot chatty"
-
-
-def test_lookup_is_cached_across_messages(bot, ctx):
-    run(bot.on_media(FakeUpdate(photo_message(caption='a')), ctx))
-    run(bot.on_media(FakeUpdate(photo_message(caption='b')), ctx))
-    assert len(bot.index.lookups) == 1
 
 
 # ── Captioned media ingests straight away ─────────────────────────────────

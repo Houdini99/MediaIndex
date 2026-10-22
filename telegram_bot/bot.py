@@ -37,9 +37,10 @@ from telegram.ext import (
 )
 
 from bots_common import resolver, site_logins
+from bots_common.index_client import AuthError, IndexUnavailable
 
 from . import config, download, parsing
-from .index_client import AuthError, IndexClient, IndexUnavailable
+from .index_client import IndexClient
 from .pending import PendingStore
 
 logging.basicConfig(
@@ -153,7 +154,8 @@ class IndexBot:
             config.INDEX_INTERNAL_URL,
             config.INDEX_BOT_USERNAME,
             config.INDEX_BOT_APP_PASSWORD,
-            auth_cooldown=config.AUTH_RETRY_SECONDS)
+            auth_cooldown=config.AUTH_RETRY_SECONDS,
+            lookup_ttl=config.LOOKUP_TTL)
         self.store = store or PendingStore()
         self.downloads = downloader or download.LinkDownloader()
         # media_group_id -> {'items': [...], 'task': Task, 'message': Message}
@@ -162,31 +164,23 @@ class IndexBot:
         # tasks, so without these the GC can destroy an album's flush
         # mid-await and the album is silently never ingested.
         self._album_tasks = set()
-        self._lookup_cache = {}       # telegram_id -> (username|None, expires)
         self._auth_backoff_until = 0.0
 
     # ── The ingest gate ────────────────────────────────────────────────
     async def _owner_for(self, user):
         """Index username that owns this sender's uploads, or None.
 
-        Cached briefly, negative answers included, so a flood from one
-        unlinked account costs one lookup per minute rather than one per
-        message.
+        The client caches the answer briefly, "not linked" included, so a
+        flood from one unlinked account costs one lookup per minute rather
+        than one per message. A rejected app password is an outage here.
         """
-        cached = self._lookup_cache.get(user.id)
-        if cached and cached[1] > time.monotonic():
-            return cached[0]
         try:
-            owner = await self.index.lookup_telegram_user(user.id, user.username)
+            return await self.index.lookup_telegram_user(user.id, user.username)
         except AuthError as e:
             logging.error("gate: index auth failed; backing off %ss",
                           config.AUTH_RETRY_SECONDS, exc_info=True)
             self._auth_backoff_until = time.monotonic() + config.AUTH_RETRY_SECONDS
             raise IndexUnavailable("the index rejected the bot's login") from e
-        # Only a real answer is cached. Caching an outage would keep the
-        # gate shut for the rest of the TTL after the index came back.
-        self._lookup_cache[user.id] = (owner, time.monotonic() + config.LOOKUP_TTL)
-        return owner
 
     async def _gate(self, message, user):
         """The owner for this sender, or None once the reason has been

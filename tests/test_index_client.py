@@ -1,5 +1,6 @@
-"""discord_bot/index_client.py: the /api/upload transport and the cooldown
-that keeps a burst of ingests from spending the index's IP-ban budget (10
+"""bots_common/index_client.py and the bots' subclasses: the /api/upload
+transport, the identity lookups and their cache, and the cooldown that
+keeps a burst of ingests from spending the index's IP-ban budget (10
 failed logins in 15 minutes ban the container for 24 hours).
 
 The API is the client's only transport, so the cooldown is tested there.
@@ -12,7 +13,9 @@ import asyncio
 
 import pytest
 
-from discord_bot.index_client import AuthError, IndexClient, IndexUnavailable
+from bots_common.index_client import AuthError, IndexUnavailable
+from discord_bot.index_client import IndexClient
+from telegram_bot.index_client import IndexClient as TelegramClient
 
 def run(coro):
     return asyncio.run(coro)
@@ -66,9 +69,9 @@ class FakeSession:
                    if m == method and u.endswith(suffix))
 
 
-def _client(handler, **kw):
-    client = IndexClient('http://web:5001', 'Bot',
-                         kw.pop('app_password', 'token'), **kw)
+def _client(handler, cls=IndexClient, **kw):
+    client = cls('http://web:5001', 'Bot',
+                 kw.pop('app_password', 'token'), **kw)
     client._session = FakeSession(handler)
     return client
 
@@ -138,14 +141,16 @@ def test_api_rejection_raises_and_starts_the_cooldown(tmp_path):
         run(client.upload(str(f), 'pic.png', 'cats'))
 
 
-def test_api_missing_endpoint_names_the_fix(tmp_path):
-    """A 404 means the index predates /api/upload, so the message points
-    at the only fix: upgrading the index."""
+def test_api_missing_endpoint_is_an_error_not_a_cooldown(tmp_path):
+    """A 404 is a wrong INDEX_INTERNAL_URL, not a rejected credential: it
+    can't feed the IP ban, so it fails the file like any other 4xx."""
     f = tmp_path / 'pic.png'
     f.write_bytes(b'x')
     client = _api_client(FakeResponse(status=404))
-    with pytest.raises(AuthError, match='upgrade the index'):
-        run(client.upload(str(f), 'pic.png', 'cats'))
+    result = run(client.upload(str(f), 'pic.png', 'cats'))
+    assert result.status == 'error' and result.retryable is False
+    assert result.detail == 'the index returned HTTP 404'
+    assert client._blocked_until == 0
 
 
 def test_api_server_error_is_retryable_but_a_client_error_is_not(tmp_path):
@@ -246,6 +251,127 @@ def test_lookup_network_error_is_unavailable():
         run(client.lookup_discord_user(1))
 
 
+# ── Telegram identity lookup ──────────────────────────────────────────────
+def _telegram_client(response):
+    seen = []
+
+    def handler(method, url, kw):
+        assert method == 'GET' and url.endswith('/api/telegram/user'), url
+        seen.append(kw)
+        return response
+
+    return _client(handler, cls=TelegramClient), seen
+
+
+def test_telegram_lookup_sends_the_id_and_the_username():
+    client, seen = _telegram_client(FakeResponse(payload={'username': 'alice'}))
+    assert run(client.lookup_telegram_user(5, 'alice_tg')) == 'alice'
+    assert seen[0]['params'] == {'telegram_id': '5', 'username': 'alice_tg'}
+    assert run(client.lookup_telegram_user(6)) == 'alice'
+    assert seen[1]['params'] == {'telegram_id': '6'}
+
+
+def test_telegram_lookup_404_means_not_linked():
+    client, _ = _telegram_client(FakeResponse(status=404))
+    assert run(client.lookup_telegram_user(5)) is None
+
+
+def test_telegram_lookup_rejection_raises_and_starts_the_cooldown():
+    client, _ = _telegram_client(FakeResponse(status=401))
+    with pytest.raises(AuthError, match='DELEGATED_UPLOADERS'):
+        run(client.lookup_telegram_user(5))
+    with pytest.raises(AuthError, match='not retrying'):
+        run(client.lookup_telegram_user(5))
+
+
+@pytest.mark.parametrize('response', [
+    FakeResponse(status=502),
+    FakeResponse(status=200, text='<html>?</html>'),
+    FakeResponse(status=200, payload={}),
+])
+def test_telegram_lookup_without_an_answer_is_unavailable(response):
+    """An unreadable reply used to escape the Telegram client as a bare
+    ValueError; it is an outage like any other now."""
+    client, _ = _telegram_client(response)
+    with pytest.raises(IndexUnavailable):
+        run(client.lookup_telegram_user(5))
+
+
+# ── The lookup cache ──────────────────────────────────────────────────────
+class _Links:
+    """An identity endpoint that answers from `links` (missing = 404) and
+    counts the requests, or raises `outage` instead when it is set."""
+
+    def __init__(self, links):
+        self.links = links
+        self.outage = None
+        self.asked = []
+
+    def __call__(self, method, url, kw):
+        fields = kw.get('params') or kw['data']
+        uid = int(fields.get('discord_id') or fields['telegram_id'])
+        if url.endswith('/api/discord/verify'):
+            self.links[uid] = 'alice'
+            return FakeResponse(payload={'username': 'alice'})
+        self.asked.append(uid)
+        if self.outage:
+            return FakeResponse(status=self.outage)
+        if uid in self.links:
+            return FakeResponse(payload={'username': self.links[uid]})
+        return FakeResponse(status=404)
+
+
+@pytest.mark.parametrize('cls, lookup', [
+    (IndexClient, 'lookup_discord_user'),
+    (TelegramClient, 'lookup_telegram_user'),
+])
+def test_answers_are_cached_not_linked_included(cls, lookup):
+    links = _Links({42: 'alice'})
+    client = _client(links, cls=cls)
+    ask = getattr(client, lookup)
+    assert run(ask(42)) == 'alice' and run(ask(42)) == 'alice'
+    assert run(ask(7)) is None and run(ask(7)) is None
+    assert links.asked == [42, 7]
+
+
+@pytest.mark.parametrize('cls, lookup', [
+    (IndexClient, 'lookup_discord_user'),
+    (TelegramClient, 'lookup_telegram_user'),
+])
+def test_an_outage_is_not_cached(cls, lookup):
+    """Caching it would keep a linked user unlinked for the rest of the
+    TTL after the index came back."""
+    links = _Links({42: 'alice'})
+    links.outage = 502
+    client = _client(links, cls=cls)
+    ask = getattr(client, lookup)
+    with pytest.raises(IndexUnavailable):
+        run(ask(42))
+    links.outage = None
+    assert run(ask(42)) == 'alice'
+    assert links.asked == [42, 42]
+
+
+def test_cached_answers_expire():
+    links = _Links({})
+    client = _client(links, lookup_ttl=60)
+    assert run(client.lookup_discord_user(42)) is None
+    links.links[42] = 'alice'
+    assert run(client.lookup_discord_user(42)) is None      # still cached
+    client._owners[42] = (None, 0)                           # TTL elapsed
+    assert run(client.lookup_discord_user(42)) == 'alice'
+
+
+def test_a_redeemed_link_code_drops_the_cached_answer():
+    links = _Links({})
+    client = _client(links)
+    assert run(client.lookup_discord_user(42)) is None      # caches "not linked"
+    assert run(client.verify_discord_link(42, 'K7QX-M2PA')) == 'alice'
+    # The cached "not linked" must not outlive the link.
+    assert run(client.lookup_discord_user(42)) == 'alice'
+    assert links.asked == [42, 42]
+
+
 # ── Redeeming a link code ─────────────────────────────────────────────────
 def _verify_client(response):
     seen = {}
@@ -310,7 +436,6 @@ def test_site_login_returns_the_stored_login():
 
 
 def test_no_stored_login_is_none_not_an_error():
-    """404 is also what an index from before site logins answers."""
     client = _site_client(FakeResponse(status=404, text='not found'))
     assert run(client.site_login('https://youtu.be/1')) is None
 

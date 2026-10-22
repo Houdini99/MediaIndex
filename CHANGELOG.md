@@ -27,19 +27,29 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The gallery, feed and lightbox APIs read each item's stored type instead
   of working it out from the file name for every row, and the duplicate
   finder counts items per type in one query.
+- When the index answers an upload with 404 (in practice a wrong
+  `INDEX_INTERNAL_URL`), the Discord bot fails that file with "the index
+  returned HTTP 404", like the Telegram bot and any other refused upload.
+  Before, it stopped calling the index for `AUTH_RETRY_SECONDS`, as if its
+  app password had been rejected, and asked for an index upgrade.
 - A `DISCORD_LOG_CHANNEL_ID` that is not a number now stops the Discord
   bot at startup with a message naming the variable, like the bots' other
   number settings. Before, it turned the log channel off without a word.
 - Code clean-up from an audit, with no change in behaviour: dead code
-  removed; the bots share one download path and one module that reads
-  their settings (`bots_common/env.py`), and the app one helper each
-  for decrypting a private file, parsing id lists and checking the bots'
-  API accounts; the database modules lost their wrapper and set-up
-  functions; the pages share one header, one set of card and button
-  styles, and the sign-in pages one layout.
+  removed; the bots share one download path, one module that reads
+  their settings (`bots_common/env.py`) and one client for the index's
+  API with the account-link cache (`bots_common/index_client.py`), and
+  the app one helper each for decrypting a private file, parsing id lists
+  and checking the bots' API accounts; the database modules lost their
+  wrapper and set-up functions; the pages share one header, one set of
+  card and button styles, and the sign-in pages one layout.
 
 ### Fixed
 
+- The Telegram bot gave no answer at all when the index's reply to its
+  account lookup was unreadable; it logged an unhandled error. It now
+  tells the sender it can't reach the index right now, as for any other
+  outage.
 - `scripts/set_password_hash.py` accepted `plain` hashes, which the
   pinned Werkzeug can no longer check: every login of that user then
   failed with a server error. It accepts only `scrypt` and `pbkdf2` now.

@@ -33,9 +33,10 @@ import discord
 
 from bots_common import resolver, site_logins, sniff
 from bots_common.download import TooLarge
+from bots_common.index_client import AuthError, IndexUnavailable
 
 from . import config, download, notifier, parsing, retry
-from .index_client import AuthError, IndexClient, IndexUnavailable
+from .index_client import IndexClient
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -106,7 +107,8 @@ class IndexBot(discord.Client):
         self.index = IndexClient(config.INDEX_INTERNAL_URL,
                                  config.INDEX_BOT_USERNAME,
                                  config.INDEX_BOT_APP_PASSWORD,
-                                 auth_cooldown=config.AUTH_RETRY_SECONDS)
+                                 auth_cooldown=config.AUTH_RETRY_SECONDS,
+                                 lookup_ttl=config.LOOKUP_TTL)
         self._auth_backoff_until = 0.0
         # Strong references: asyncio only weakly references scheduled
         # tasks, so without these the GC destroys the loops mid-await.
@@ -117,7 +119,6 @@ class IndexBot(discord.Client):
         # channel forwards, or the other way round.
         self._pending_forwards = {}
         self._forward_tasks = set()   # strong refs, same asyncio gotcha
-        self._owner_cache = {}        # discord_id -> (username|None, expires)
         self._downloader = download.CdnDownloader()
         self._log_channel = None      # resolved bot-logs channel (cache)
         self._announced = False       # startup line posted once per process
@@ -327,29 +328,13 @@ class IndexBot(discord.Client):
                             exc_info=True)
             return None
 
-    async def _owner_for(self, discord_id):
-        """Index username this Discord id is linked to, or None.
-
-        Cached for LOOKUP_TTL, "not linked" included. An outage raises
-        (IndexUnavailable, or AuthError for a rejected app password) and is
-        never cached — that would keep a linked user unlinked after the
-        index came back.
-        """
-        cached = self._owner_cache.get(discord_id)
-        if cached and cached[1] > time.monotonic():
-            return cached[0]
-        owner = await self.index.lookup_discord_user(discord_id)
-        self._owner_cache[discord_id] = (owner,
-                                         time.monotonic() + config.LOOKUP_TTL)
-        return owner
-
     async def _dm_sender_linked(self, message, attempts, tags):
         """Whether a DM may go ahead: its sender linked an index account,
         so there is someone to store it privately for. Otherwise says why
         in the DM — and settles the message as retryable when the index
         simply could not be asked."""
         try:
-            if await self._owner_for(message.author.id):
+            if await self.index.lookup_discord_user(message.author.id):
                 return True
         except AuthError:
             logging.exception("dm: index auth failed; backing off %ss",
@@ -401,8 +386,6 @@ class IndexBot(discord.Client):
                 text = (f"❌ That code is wrong, already used, or expired. Get "
                         f"a new one at {config.INDEX_PUBLIC_URL}/settings.")
             else:
-                # The cached "not linked" (or the previous owner) is stale.
-                self._owner_cache.pop(message.author.id, None)
                 logging.info("link: discord id %s linked to %s",
                              message.author.id, username)
                 text = (f"✅ Linked to index account **{username}**. What you "
@@ -905,7 +888,8 @@ class IndexBot(discord.Client):
                                     f"ingest-{uuid.uuid4().hex}.{ext}")
         try:
             # Asked before a byte is downloaded.
-            uploaded_for = await self._owner_for(message.author.id)
+            uploaded_for = await self.index.lookup_discord_user(
+                message.author.id)
             if private and not uploaded_for:
                 # _handle_message turned unlinked DMs away, but the link can
                 # be removed while a forward waits or a download runs — and

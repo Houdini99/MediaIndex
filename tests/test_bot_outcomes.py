@@ -12,8 +12,8 @@ import types
 
 import pytest
 
+from bots_common.index_client import UploadResult
 from discord_bot import bot as botmod
-from discord_bot.index_client import UploadResult
 
 
 def run(coro):

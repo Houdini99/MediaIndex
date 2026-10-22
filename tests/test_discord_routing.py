@@ -24,8 +24,8 @@ import types
 import pytest
 
 from bots_common import resolver, site_logins, sniff
+from bots_common.index_client import AuthError, IndexUnavailable
 from discord_bot import bot as botmod
-from discord_bot.index_client import AuthError, IndexUnavailable
 
 YOUTUBE = 'https://www.youtube.com/watch?v=1'
 ARTICLE = 'https://news.example.com/article'

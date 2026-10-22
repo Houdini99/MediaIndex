@@ -23,10 +23,10 @@ import types
 import pytest
 
 from bots_common.download import TooLarge
+from bots_common.index_client import AuthError, IndexUnavailable, UploadResult
 from bots_common.sniff import Blocked
 from discord_bot import bot as botmod
 from discord_bot import config
-from discord_bot.index_client import AuthError, IndexUnavailable, UploadResult
 
 discord = botmod.discord
 
@@ -129,11 +129,9 @@ def channel_message(author_id=42, content='', mid=600):
 def bot(monkeypatch):
     monkeypatch.setattr(config, 'INGEST_ROLE', 'Verified')
     monkeypatch.setattr(config, 'DM_INGEST', True)
-    monkeypatch.setattr(config, 'LOOKUP_TTL', 60)
     b = botmod.IndexBot.__new__(botmod.IndexBot)
     b.user = types.SimpleNamespace(id=1)
     b.index = FakeIndex(links={42: 'alice'})
-    b._owner_cache = {}
     b._auth_backoff_until = 0.0
     b._retry = FakeQueue()
     b.guild = FakeGuild({42: types.SimpleNamespace(
@@ -313,19 +311,6 @@ def test_an_owner_lookup_outage_is_retryable_and_downloads_nothing(bot):
     assert bot.downloads == [] and bot.index.uploads == []
 
 
-def test_owner_lookups_are_cached_but_outages_are_not(bot):
-    run(bot._owner_for(42))
-    run(bot._owner_for(42))
-    assert bot.index.lookups == [42]
-
-    bot.index.lookup_error = IndexUnavailable("down")
-    with pytest.raises(IndexUnavailable):
-        run(bot._owner_for(99))
-    bot.index.lookup_error = None
-    bot.index.links[99] = 'bob'
-    assert run(bot._owner_for(99)) == 'bob'
-
-
 # ── Refused downloads ─────────────────────────────────────────────────────
 def _failing_download(bot, error):
     async def download(att, dest):
@@ -389,13 +374,10 @@ def test_tags_typed_in_a_dm_do_not_tag_channel_forwards(bot):
 def test_a_link_code_links_the_sender_and_says_so(bot):
     bot.index.links = {}
     bot.index.codes = {'K7QX-M2PA': 'alice'}
-    run(bot._owner_for(42))                    # caches "not linked"
     msg = dm(content='link K7QX-M2PA')
     run(botmod.IndexBot.on_message(bot, msg))
     assert bot.index.redeemed == [(42, 'K7QX-M2PA')]
     assert 'Linked to index account **alice**' in msg.channel.sent[0]
-    # The cached "not linked" must not outlive the link.
-    assert run(bot._owner_for(42)) == 'alice'
     assert not bot.handled                     # never treated as ingest
 
 

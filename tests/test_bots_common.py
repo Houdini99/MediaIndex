@@ -13,12 +13,15 @@ import pathlib
 import pytest
 
 import bots_common.download as common_download
+import bots_common.index_client as common_index
 import bots_common.parsing as common_parsing
 from discord_bot import config as discord_config
 from discord_bot import download as discord_download
+from discord_bot import index_client as discord_index
 from discord_bot import parsing as discord_parsing
 from telegram_bot import config as telegram_config
 from telegram_bot import download as telegram_download
+from telegram_bot import index_client as telegram_index
 from telegram_bot import parsing as telegram_parsing
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -39,6 +42,17 @@ def test_both_bots_download_with_the_shared_fetch():
     fetch a link without them."""
     assert discord_download.fetch is common_download.fetch
     assert telegram_download.fetch is common_download.fetch
+
+
+@pytest.mark.parametrize('client', [discord_index.IndexClient,
+                                    telegram_index.IndexClient])
+def test_both_bots_talk_to_the_index_through_the_shared_client(client):
+    """Each bot adds its own identity lookup, and nothing else: the
+    upload, the cooldown and the lookup cache exist once."""
+    assert issubclass(client, common_index.IndexClient)
+    own = {name for name in vars(client) if not name.startswith('__')}
+    assert own <= {'lookup_discord_user', 'verify_discord_link',
+                   'lookup_telegram_user'}, own
 
 
 @pytest.mark.parametrize('config', [discord_config, telegram_config])

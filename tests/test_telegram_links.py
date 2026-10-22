@@ -23,9 +23,9 @@ import types
 import pytest
 
 from bots_common import resolver, site_logins, sniff
+from bots_common.index_client import IndexUnavailable
 from telegram_bot import config, download
 from telegram_bot.bot import IndexBot
-from telegram_bot.index_client import IndexUnavailable
 from telegram_bot.pending import PendingStore
 from test_telegram_ingest import (
     FakeContext,

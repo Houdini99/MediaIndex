@@ -94,8 +94,9 @@ app/
 bots_common/           shared by both bots: yt-dlp resolver, link and tag
                        parsing, sniff.py (link probing and address checks),
                        download.py (checked, capped downloads), env.py
-                       (reading settings), site_logins.py, ytdlp_fixes.py
-                       (extractor stopgaps)
+                       (reading settings), index_client.py (the index's
+                       API), site_logins.py, ytdlp_fixes.py (extractor
+                       stopgaps)
 discord_bot/           the Discord bot (its own image)
 telegram_bot/          the Telegram bot (its own image)
 scripts/               maintenance scripts (run inside the web container)
@@ -133,7 +134,7 @@ by git.
   `bots_common/`. Use `./build.sh discord` or `./build.sh telegram`; by
   hand that is `docker build -f discord_bot/Dockerfile -t index-discord-bot .`.
 - Code both bots need belongs in `bots_common/`. `tests/test_bots_common.py`
-  fails if a bot grows its own copy of the resolver, the parsers or the
-  settings readers.
+  fails if a bot grows its own copy of the resolver, the parsers, the
+  settings readers or the index client.
 - The bots only talk to the index through its HTTP API
   ([API](api.md#bot-endpoints)), never to the database.
