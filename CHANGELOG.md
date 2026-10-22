@@ -46,7 +46,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bot at startup with a message naming the variable, like the bots' other
   number settings. Before, it turned the log channel off without a word.
 - Code clean-up from an audit, with no change in behaviour: dead code
-  removed; the bots share one download path, one module that reads
+  removed; the bots share one download path (one downloader class, and
+  one redirect walker that checks every hop), one module that reads
   their settings (`bots_common/env.py`), one client for the index's API
   with the account-link cache (`bots_common/index_client.py`) and one
   wrapper around the yt-dlp download (`resolver.resolve_async()`), and

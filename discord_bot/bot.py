@@ -615,8 +615,8 @@ class IndexBot(discord.Client):
             candidates = [u for u in candidates if u not in claimed]
         if not candidates:
             return {}
-        return await sniff.sniff_many(self._downloader.session(), candidates,
-                                      config.ALLOWED_EXT)
+        return await self._downloader.sniff_links(candidates,
+                                                  config.ALLOWED_EXT)
 
     @staticmethod
     def _embed_media(embed):

@@ -19,6 +19,7 @@ import pytest
 
 from bots_common import sniff
 from discord_bot import bot as botmod
+from discord_bot import download
 
 ALLOWED = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov', 'mkv'}
 BARE_FILE = 'https://files.example/ab/cd/abcdef0123456789abcdef0123456789'
@@ -198,7 +199,8 @@ def _message(content):
 @pytest.fixture
 def bot(monkeypatch):
     b = botmod.IndexBot.__new__(botmod.IndexBot)
-    b._downloader = types.SimpleNamespace(session=lambda: 'session')
+    b._downloader = download.CdnDownloader()
+    b._downloader._session = 'session'      # never opened: sniff is faked
     b.sniffed = []
 
     async def fake_sniff(session, url, allowed_ext):

@@ -16,6 +16,7 @@ networks, so every hop goes through require_public first — the same bar
 bots_common/download.py sets on every download.
 """
 import asyncio
+import contextlib
 import email.message
 import ipaddress
 import logging
@@ -128,6 +129,27 @@ def media_name(url, headers, allowed_ext):
     return f'{stem}.{ext}'
 
 
+@contextlib.asynccontextmanager
+async def follow_public(session, method, url, **kw):
+    """Request `url`, following redirects by hand so require_public vets
+    every hop before it is requested. Yields (final url, response) for the
+    first answer that is not a redirect; raises Blocked for a refused
+    address or more than MAX_REDIRECTS hops, and aiohttp's own errors.
+    Both bots' downloads (download.fetch) and sniffs go through it."""
+    send = getattr(session, method.lower())
+    for _ in range(MAX_REDIRECTS + 1):
+        # getaddrinfo blocks; a slow resolver must not stall the bot.
+        await asyncio.to_thread(require_public, url)
+        async with send(url, allow_redirects=False, **kw) as resp:
+            location = resp.headers.get('Location')
+            if resp.status in REDIRECTS and location:
+                url = urllib.parse.urljoin(url, location)
+                continue
+            yield url, resp
+            return
+    raise Blocked(f"that link redirected more than {MAX_REDIRECTS} times")
+
+
 async def sniff(session, url, allowed_ext):
     """(url, filename) for a link that serves media the index takes, else
     None. The url is the one the redirects ended at, already vetted.
@@ -137,29 +159,19 @@ async def sniff(session, url, allowed_ext):
     other paths (the Discord bot's metadata probe vets the address again
     before it reads the page).
     """
+    timeout = aiohttp.ClientTimeout(total=SNIFF_TIMEOUT)
     try:
-        for _ in range(MAX_REDIRECTS + 1):
-            # getaddrinfo blocks; a slow resolver must not stall the bot.
-            await asyncio.to_thread(require_public, url)
-            async with session.head(
-                    url, allow_redirects=False,
-                    timeout=aiohttp.ClientTimeout(total=SNIFF_TIMEOUT)) as resp:
-                location = resp.headers.get('Location')
-                if resp.status in REDIRECTS and location:
-                    url = urllib.parse.urljoin(url, location)
-                    continue
-                if resp.status >= 400:
-                    logging.info("sniff: %s answered HTTP %s", url,
-                                 resp.status)
-                    return None
-                name = media_name(url, resp.headers, allowed_ext)
-                if name:
-                    logging.info("sniff: %s serves %s as %s", url,
-                                 resp.headers.get('Content-Type'), name)
-                    return url, name
+        async with follow_public(session, 'HEAD', url,
+                                 timeout=timeout) as (url, resp):
+            if resp.status >= 400:
+                logging.info("sniff: %s answered HTTP %s", url, resp.status)
                 return None
-        logging.info("sniff: %s redirected more than %d times", url,
-                     MAX_REDIRECTS)
+            name = media_name(url, resp.headers, allowed_ext)
+            if name:
+                logging.info("sniff: %s serves %s as %s", url,
+                             resp.headers.get('Content-Type'), name)
+                return url, name
+            return None
     except Blocked as e:
         logging.info("sniff: not fetching %s — %s", url, e)
     except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:

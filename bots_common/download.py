@@ -11,23 +11,24 @@ They share how that fetch is made —
     without `require_public` (bots_common/sniff.py), a link ending in
     `.jpg` would be a way to make one fetch `http://web:5001/…`, or any of
     the stack's internal services, and put the answer in the sender's
-    library. Redirects are followed by hand so every hop is checked.
+    library. Redirects are followed by hand (sniff.follow_public) so
+    every hop is checked.
   * **A cap that is enforced twice.** `Content-Length` is checked before a
     byte is written, and the running total is checked again during the
     transfer: a chunked response carries no length to trust, and the
     sender chooses the URL.
 
-— while each bot keeps its own session and what it does around the fetch
-(the Discord bot re-signs an expired CDN link and tries once more).
+— and the Downloader that owns the session both use. Each bot subclasses
+it with what it does around the fetch (the Discord bot re-signs an
+expired CDN link and tries once more).
 """
-import asyncio
 import logging
 import time
-import urllib.parse
 
-from . import parsing
+import aiohttp
+
+from . import parsing, sniff
 from .resolver import PROGRESS_INTERVAL
-from .sniff import MAX_REDIRECTS, REDIRECTS, Blocked, require_public
 
 
 class TooLarge(Exception):
@@ -39,6 +40,38 @@ class TooLarge(Exception):
         self.size = size
 
 
+class Downloader:
+    """Owns a bot's download session for the bot's lifetime.
+
+    The session is created lazily on first use and closed by the bot's
+    shutdown, which is why this is an object rather than a handful of
+    free functions.
+    """
+
+    def __init__(self):
+        self._session = None
+
+    def session(self):
+        """Lazy aiohttp session. No total timeout — a 400 MB video takes as
+        long as it takes — but a stalled read dies."""
+        if self._session is None:
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=None, connect=30,
+                                              sock_read=120))
+        return self._session
+
+    async def close(self):
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
+
+    async def sniff_links(self, urls, allowed_ext):
+        """{url: (fetch_url, filename)} for links that name no file but
+        serve one — one HEAD each, every hop past `require_public` first
+        (see bots_common/sniff.py)."""
+        return await sniff.sniff_many(self.session(), urls, allowed_ext)
+
+
 async def fetch(session, url, dst, label, max_bytes=None):
     """Stream `url` to `dst`, refusing anything over `max_bytes` (None
     means no cap). `dst` is reopened each call, so a retry cleanly
@@ -48,17 +81,8 @@ async def fetch(session, url, dst, label, max_bytes=None):
     for an oversized file, and aiohttp's own errors (ClientResponseError
     for an error status) for everything else.
     """
-    for _ in range(MAX_REDIRECTS + 1):
-        # getaddrinfo blocks; a slow resolver must not stall the bot.
-        await asyncio.to_thread(require_public, url)
-        async with session.get(url, allow_redirects=False) as resp:
-            location = resp.headers.get('Location')
-            if resp.status in REDIRECTS and location:
-                url = urllib.parse.urljoin(url, location)
-                continue
-            await _stream(resp, dst, label, max_bytes)
-            return
-    raise Blocked(f"that link redirected more than {MAX_REDIRECTS} times")
+    async with sniff.follow_public(session, 'GET', url) as (_, resp):
+        await _stream(resp, dst, label, max_bytes)
 
 
 async def _stream(resp, dst, label, max_bytes):

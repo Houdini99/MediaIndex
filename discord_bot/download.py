@@ -1,16 +1,12 @@
 """Downloading the media a Discord message carries.
 
-Split out of discord_bot/bot.py, which held the gateway client, this
-downloader, the retry driver, the reaction vocabulary and the log-channel
-formatting in one 712-line module. Nothing here
-touches Discord's gateway or the bot's own state — it owns one aiohttp
-session and knows how to get bytes onto disk — so it lifts out whole.
-
-The fetch itself is bots_common/download.py, shared with the Telegram
-bot: streamed to disk in 1 MiB chunks (discord.py's `att.save()` would
-read a large forwarded video into memory first), and public addresses
-only on every redirect hop. That last part matters for links: a message
-may carry any URL, and this container sits on `proxy` and `backend`.
+Nothing here touches Discord's gateway or the bot's own state. The
+session and the fetch itself are bots_common/download.py, shared with
+the Telegram bot: streamed to disk in 1 MiB chunks (discord.py's
+`att.save()` would read a large forwarded video into memory first), and
+public addresses only on every redirect hop. That last part matters for
+links: a message may carry any URL, and this container sits on `proxy`
+and `backend`.
 
 What this module adds on top:
 
@@ -26,7 +22,7 @@ import logging
 
 import aiohttp
 
-from bots_common.download import fetch
+from bots_common.download import Downloader, fetch
 
 from . import config, parsing
 
@@ -36,30 +32,9 @@ REFRESH_URL_ENDPOINT = 'https://discord.com/api/v10/attachments/refresh-urls'
 _EXPIRED_STATUSES = (403, 404)
 
 
-class CdnDownloader:
-    """Owns the download session for the lifetime of the bot.
-
-    The session is created lazily on first use and must be closed by the
-    caller (`IndexBot.close`), which is why it is an object rather than a
-    handful of module-level functions.
-    """
-
-    def __init__(self):
-        self._session = None
-
-    def session(self):
-        """Lazy aiohttp session for attachment downloads. No total timeout —
-        a 400 MB video takes as long as it takes — but a stalled read dies."""
-        if self._session is None:
-            self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=None, connect=30,
-                                              sock_read=120))
-        return self._session
-
-    async def close(self):
-        if self._session is not None:
-            await self._session.close()
-            self._session = None
+class CdnDownloader(Downloader):
+    """The shared Downloader, plus the link cap and CDN re-signing.
+    Closed by `IndexBot.close`."""
 
     async def stream(self, url, dst, label):
         """Stream a URL to disk, capped unless it is on Discord's CDN.

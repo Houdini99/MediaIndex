@@ -44,6 +44,23 @@ def test_both_bots_download_with_the_shared_fetch():
     assert telegram_download.fetch is common_download.fetch
 
 
+@pytest.mark.parametrize('downloader', [discord_download.CdnDownloader,
+                                        telegram_download.LinkDownloader])
+def test_both_bots_keep_their_session_in_the_shared_downloader(downloader):
+    assert issubclass(downloader, common_download.Downloader)
+    assert not {'session', 'close', 'sniff_links'} & set(vars(downloader))
+
+
+def test_redirects_are_followed_in_one_place():
+    """Every hop has to pass require_public. A second hand-written redirect
+    loop is a second place to forget it: use sniff.follow_public."""
+    loops = [str(path.relative_to(REPO))
+             for pkg in ('bots_common', 'discord_bot', 'telegram_bot')
+             for path in sorted((REPO / pkg).glob('*.py'))
+             if 'allow_redirects=False' in path.read_text()]
+    assert loops == ['bots_common/sniff.py']
+
+
 @pytest.mark.parametrize('client', [discord_index.IndexClient,
                                     telegram_index.IndexClient])
 def test_both_bots_talk_to_the_index_through_the_shared_client(client):
