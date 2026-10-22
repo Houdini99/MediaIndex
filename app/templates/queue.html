@@ -1,16 +1,14 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Untagged{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/queue.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title">Untagged</div>
-    <div class="page-sub">Files dumped into your WebDAV folder, waiting for tags</div>
-  </div>
+  {{ page_header('Untagged', 'Files dumped into your WebDAV folder, waiting for tags') }}
 
-  <div class="queue-layout">
-    <div class="queue-card">
+  <div class="side-layout queue-layout">
+    <div class="panel-card">
       <div id="queueEmpty" class="queue-empty" hidden>
         <span class="queue-empty-icon">&#9729;</span>
         <h3>Nothing waiting</h3>
@@ -45,7 +43,7 @@
         </button>
         <button type="button" class="btn" id="davRevokeBtn" {{ '' if dav_configured else 'hidden' }}>Revoke</button>
       </div>
-      <div class="dav-hint">
+      <div class="card-hint">
         Mount this address as a network drive (Windows: Map network drive,
         macOS: Finder &rarr; Connect to Server, Android/iOS: any WebDAV-capable
         file app) and sign in with the app password — not your login password.

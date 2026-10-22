@@ -1,13 +1,11 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Settings{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title">Settings</div>
-    <div class="page-sub">Your account and the services that upload on your behalf</div>
-  </div>
+  {{ page_header('Settings', 'Your account and the services that upload on your behalf') }}
 
   <div class="settings-layout">
     <div class="info-card">
@@ -29,7 +27,7 @@
           <button type="submit" class="btn btn-primary">Change password</button>
         </div>
       </form>
-      <div class="settings-hint">
+      <div class="card-hint">
         Changing your password logs you out on every other device. Your app
         password for WebDAV and scripts, on the <a href="{{ url_for('media.queue') }}">Untagged</a>
         page, stays the same.
@@ -63,7 +61,7 @@
                   {{ '' if (telegram_id or telegram_username) else 'hidden' }}>Unlink</button>
         </div>
       </div>
-      <div class="settings-hint">
+      <div class="card-hint">
         Message the bot and everything you send gets indexed under your
         account. Put your tags in the caption (<code>cats,funny</code>);
         media with no tags is held until you send them.
@@ -88,7 +86,7 @@
             <code id="dcCode"></code>
             <button type="button" class="btn" id="dcCopyBtn">Copy</button>
           </div>
-          <div class="settings-hint" id="dcCodeHint"></div>
+          <div class="card-hint" id="dcCodeHint"></div>
         </div>
         <div class="link-actions">
           <button type="button" class="btn btn-primary" id="dcCodeBtn">
@@ -98,7 +96,7 @@
                   {{ '' if discord_id else 'hidden' }}>Unlink</button>
         </div>
       </div>
-      <div class="settings-hint">
+      <div class="card-hint">
         Media you post in the Discord ingest channel is credited to your
         account, and you can DM the bot to save media <strong>privately</strong>
         (needs the server's ingest role). Linking proves the Discord account

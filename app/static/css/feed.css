@@ -528,8 +528,6 @@
         border-radius: 50%;
         animation: spin .7s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     /* The sentinel doubles as the error surface — it is the only element
        guaranteed to be where the reader is looking when a page fails to
        load, and the retry has to be a real control because the observer

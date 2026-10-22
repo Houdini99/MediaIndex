@@ -4,9 +4,21 @@
   <meta charset="UTF-8"/>
   <title>{% block title %}MediaIndex{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 </head>
 <body>
-  {% block content %}{% endblock %}
+  <div class="auth-wrap">
+    <a class="auth-brand" href="#">
+      <span class="auth-brand-mark">M</span>
+      <span class="auth-brand-name">MediaIndex</span>
+    </a>
+    <div class="auth-card">
+      <div class="auth-title">{% block heading %}{% endblock %}</div>
+      <div class="auth-subtitle">{% block subheading %}{% endblock %}</div>
+      {% include '_flash.html' %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
 </body>
 </html>

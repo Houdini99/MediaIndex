@@ -1,16 +1,11 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Integrity Check{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title-group">
-      <div class="page-title">Integrity Check</div>
-      <div class="page-sub">Database rows vs. files on disk — scanned just now</div>
-    </div>
-    {% include '_admin_tabs.html' %}
-  </div>
+  {% call page_header('Integrity Check', 'Database rows vs. files on disk — scanned just now') %}{% include '_admin_tabs.html' %}{% endcall %}
 
   {% set all_clean = not report.missing_rows and not report.orphan_files and not report.orphan_thumbs %}
   {% if all_clean %}

@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         Array.from(files).forEach((file, i) => {
             const div = document.createElement('div');
-            div.className = 'preview-item';
+            div.className = 'file-row preview-item';
 
             const url = URL.createObjectURL(file);
             let media;

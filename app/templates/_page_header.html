@@ -1,0 +1,13 @@
+{# The header every app page opens with: a title, a subtitle, and on the
+   admin pages the tabs on the right, passed in with {% call %}. #}
+{% macro page_header(title, sub) -%}
+<div class="page-header">
+    <div class="page-title-group">
+      <div class="page-title">{{ title }}</div>
+      <div class="page-sub">{{ sub }}</div>
+    </div>
+    {%- if caller is defined %}
+    {{ caller() }}
+    {%- endif %}
+  </div>
+{%- endmacro %}

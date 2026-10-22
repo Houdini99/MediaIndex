@@ -1,16 +1,11 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Logs{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title-group">
-      <div class="page-title">Logs</div>
-      <div class="page-sub">Read-only view of the application log and the security log</div>
-    </div>
-    {% include '_admin_tabs.html' %}
-  </div>
+  {% call page_header('Logs', 'Read-only view of the application log and the security log') %}{% include '_admin_tabs.html' %}{% endcall %}
 
   <div class="admin-section">
     <form method="get" action="{{ url_for('admin.logs') }}" class="admin-form log-toolbar">

@@ -1,16 +1,14 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Upload{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title">Upload</div>
-    <div class="page-sub">Upload images, GIFs, and videos</div>
-  </div>
+  {{ page_header('Upload', 'Upload images, GIFs, and videos') }}
 
-  <div class="upload-layout">
-    <div class="upload-card">
+  <div class="side-layout upload-layout">
+    <div class="panel-card">
       <form id="uploadForm" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <input id="filesInput" type="file" name="files" multiple

@@ -1,16 +1,4 @@
 /* ── TAGS PAGE ───────────────────────────────────────────────────────── */
-    .page-header {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1.75rem;
-        flex-wrap: wrap;
-    }
-    .page-title-group {}
-    .page-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em; }
-    .page-sub   { font-size: .845rem; color: var(--muted); margin-top: .2rem; }
-
     /* Stats row */
     .stats-row {
         display: grid;
@@ -18,36 +6,9 @@
         gap: .85rem;
         margin-bottom: 1.75rem;
     }
-    .stat-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1.1rem 1.25rem;
-        position: relative;
-        overflow: hidden;
-        transition: border-color .15s;
-    }
-    .stat-card:hover { border-color: var(--border2); }
-    .stat-card::after {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, var(--accent), #a855f7);
-        opacity: .7;
-    }
-    .stat-num {
-        font-size: 2rem;
-        font-weight: 700;
-        letter-spacing: -.04em;
-        background: linear-gradient(135deg, var(--text) 0%, var(--text2) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        line-height: 1.1;
-        margin-bottom: .25rem;
-    }
-    .stat-label { font-size: .78rem; color: var(--muted); font-weight: 500; letter-spacing: .01em; }
+    .stat-card { padding: 1.1rem 1.25rem; }
+    .stat-num   { font-size: 2rem; }
+    .stat-label { font-size: .78rem; }
 
     /* Search */
     .tag-toolbar {
@@ -179,8 +140,6 @@
     .no-tags-msg p:first-of-type { font-size: 1rem; font-weight: 500; color: var(--text2); }
 
     @media (max-width: 680px) {
-        nav { padding: 0 1rem; }
-        .brand-name { display: none; }
         .container { padding: 1rem; }
         .stats-row { grid-template-columns: repeat(3, 1fr); gap: .5rem; }
         .stat-num { font-size: 1.5rem; }

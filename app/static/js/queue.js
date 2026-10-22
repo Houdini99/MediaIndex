@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         items.forEach(item => {
             const row = document.createElement('div');
-            row.className = 'queue-item';
+            row.className = 'file-row queue-item';
             row.dataset.id = item.id;
 
             let media;

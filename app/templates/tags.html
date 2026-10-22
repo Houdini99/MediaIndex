@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Tags{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">{% endblock %}
 {% block body_data %}
@@ -12,12 +13,7 @@
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title-group">
-      <div class="page-title">Tags</div>
-      <div class="page-sub">All tags used and their frequency</div>
-    </div>
-  </div>
+  {{ page_header('Tags', 'All tags used and their frequency') }}
 
   <div class="stats-row">
     <div class="stat-card">

@@ -1,34 +1,6 @@
-:root {
-        /* The nav's height. The feed sizes every slide against it, so it is
-           a variable rather than a number repeated across three files;
-           feed.css derives --feed-nav-h from it. */
-        --nav-h:        58px;
-        --bg:           #020408;
-        --bg2:          #060a12;
-        --surface:      #0c1018;
-        --surf2:        #131920;
-        --surf3:        #1a2230;
-        --border:       rgba(255,255,255,.07);
-        --border2:      rgba(255,255,255,.12);
-        --border-hi:    rgba(124,106,255,.55);
-        --text:         #e8edf5;
-        --text2:        #a8b3c2;
-        --muted:        #58687a;
-        --accent:       #7c6aff;
-        --accent2:      #5b4de8;
-        --accent-glow:  rgba(124,106,255,.35);
-        --success:      #3fb950;
-        --danger:       #f85149;
-        --warning:      #d29922;
-        --r:            12px;
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html {
-        color-scheme: dark;
-        scroll-behavior: smooth;
-    }
+/* The app pages. base.css (loaded first) has the tokens, the reset and
+   the flash messages. */
+    html { scroll-behavior: smooth; }
 
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -247,35 +219,6 @@
         padding: 1.75rem 1.5rem;
     }
 
-    /* ── FLASH MESSAGES ─────────────────────────────────────────────────── */
-    .flashes { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: .4rem; }
-
-    .flash {
-        display: flex;
-        align-items: center;
-        gap: .6rem;
-        padding: .7rem 1rem;
-        border-radius: 9px;
-        font-size: .845rem;
-        border: 1px solid;
-        animation: fadeSlide .22s ease;
-    }
-    @keyframes fadeSlide {
-        from { opacity: 0; transform: translateY(-5px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-    .flash-icon {
-        width: 18px; height: 18px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: .65rem; font-weight: 900; flex-shrink: 0;
-    }
-    .flash-success { background: rgba(63,185,80,.07); border-color: rgba(63,185,80,.22); color: var(--success); }
-    .flash-success .flash-icon { background: rgba(63,185,80,.15); color: var(--success); }
-    .flash-warning { background: rgba(210,153,34,.07); border-color: rgba(210,153,34,.22); color: var(--warning); }
-    .flash-warning .flash-icon { background: rgba(210,153,34,.15); color: var(--warning); }
-    .flash-danger  { background: rgba(248,81,73,.07);  border-color: rgba(248,81,73,.22);  color: var(--danger);  }
-    .flash-danger  .flash-icon { background: rgba(248,81,73,.15);  color: var(--danger);  }
-
     /* ── BUTTONS ─────────────────────────────────────────────────────────── */
     .btn {
         display: inline-flex;
@@ -314,6 +257,142 @@
         border-color: var(--border2);
         background: rgba(255,255,255,.04);
     }
+
+    .btn-danger {
+        background: transparent;
+        color: var(--danger);
+        border: 1px solid rgba(248,81,73,.25);
+    }
+    .btn-danger:hover {
+        background: rgba(248,81,73,.1);
+        border-color: rgba(248,81,73,.5);
+        color: #ff7b72;
+    }
+
+    /* ── PAGE PARTS (shared by several pages) ───────────────────────────── */
+    /* The title row every page opens with (templates/_page_header.html):
+       title and subtitle on the left, the admin tabs on the right. */
+    .page-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.75rem;
+        flex-wrap: wrap;
+    }
+    .page-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em; }
+    .page-sub   { font-size: .845rem; color: var(--muted); margin-top: .2rem; }
+
+    /* A main column with a 320px sidebar (Upload, Untagged). Each page
+       sets where it collapses to one column. */
+    .side-layout {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1.25rem;
+        align-items: start;
+    }
+    .panel-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.5rem;
+    }
+    /* One file in a list: Upload's previews, Untagged's rows. */
+    .file-row {
+        background: var(--surf2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: .85rem 1rem;
+        display: flex;
+        gap: .9rem;
+        align-items: flex-start;
+        transition: border-color .15s;
+    }
+    .file-row:hover { border-color: var(--border2); }
+    /* The "private" checkbox under a file. */
+    .privacy-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        margin-top: .55rem;
+        font-size: .78rem;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+    }
+    .privacy-toggle input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+        accent-color: var(--accent);
+        cursor: pointer;
+    }
+
+    /* A card of key/value rows (Untagged, Settings; Upload restyles it). */
+    .info-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.25rem 1.35rem;
+    }
+    .info-card-title {
+        font-size: .78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: var(--muted);
+        margin-bottom: .9rem;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: .75rem;
+        padding: .5rem 0;
+        border-bottom: 1px solid var(--border);
+        font-size: .82rem;
+    }
+    .info-row:last-of-type { border-bottom: none; }
+    .info-key { color: var(--muted); flex-shrink: 0; }
+    .info-val { color: var(--text2); text-align: right; word-break: break-all; }
+    .card-hint {
+        margin-top: .9rem;
+        font-size: .74rem;
+        line-height: 1.5;
+        color: var(--muted);
+    }
+
+    /* Number tiles (Admin, Tags). Each page sets their padding and sizes. */
+    .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        position: relative;
+        overflow: hidden;
+        transition: border-color .15s;
+    }
+    .stat-card:hover { border-color: var(--border2); }
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent), #a855f7);
+        opacity: .7;
+    }
+    .stat-num {
+        font-weight: 700;
+        letter-spacing: -.04em;
+        background: linear-gradient(135deg, var(--text) 0%, var(--text2) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.1;
+        margin-bottom: .25rem;
+    }
+    .stat-label { color: var(--muted); font-weight: 500; letter-spacing: .01em; }
+
+    /* The loading spinners (gallery, feed). */
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── RESPONSIVE (shared) ─────────────────────────────────────────────── */
     /* Visible to assistive tech only. Clipped rather than `display:none`,

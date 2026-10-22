@@ -1,28 +1,4 @@
 /* ── UNTAGGED QUEUE PAGE ─────────────────────────────────────────────── */
-    .page-header { margin-bottom: 1.75rem; }
-    .page-title  {
-        font-size: 1.35rem;
-        font-weight: 700;
-        letter-spacing: -.03em;
-        color: var(--text);
-        margin-bottom: .25rem;
-    }
-    .page-sub { font-size: .85rem; color: var(--muted); }
-
-    .queue-layout {
-        display: grid;
-        grid-template-columns: 1fr 320px;
-        gap: 1.25rem;
-        align-items: start;
-    }
-
-    .queue-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 1.5rem;
-    }
-
     /* Empty state */
     .queue-empty {
         text-align: center;
@@ -33,19 +9,8 @@
     .queue-empty h3 { color: var(--text2); margin-bottom: .35rem; }
     .queue-empty p { font-size: .85rem; }
 
-    /* Item rows (mirrors upload.css .preview-item) */
+    /* Item rows (.file-row in common.css) */
     #queueList { display: flex; flex-direction: column; gap: .8rem; }
-    .queue-item {
-        background: var(--surf2);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: .85rem 1rem;
-        display: flex;
-        gap: .9rem;
-        align-items: flex-start;
-        transition: border-color .15s;
-    }
-    .queue-item:hover { border-color: var(--border2); }
 
     .queue-thumb {
         width: 80px;
@@ -98,23 +63,6 @@
         border-color: var(--border-hi);
     }
 
-    .privacy-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        margin-top: .55rem;
-        font-size: .78rem;
-        color: var(--muted);
-        cursor: pointer;
-        user-select: none;
-    }
-    .privacy-toggle input[type="checkbox"] {
-        width: auto;
-        margin: 0;
-        accent-color: var(--accent);
-        cursor: pointer;
-    }
-
     .status-chip {
         display: inline-block;
         font-size: .72rem;
@@ -142,26 +90,8 @@
         gap: .6rem;
         margin-top: .7rem;
     }
-    .btn-danger {
-        background: transparent;
-        color: var(--danger);
-        border: 1px solid rgba(248,81,73,.25);
-    }
-    .btn-danger:hover {
-        background: rgba(248,81,73,.1);
-        border-color: rgba(248,81,73,.5);
-        color: #ff7b72;
-    }
-
-    /* Info card (mirrors upload.css) */
-    .info-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 1.25rem 1.35rem;
-    }
     /* The sticky element is the sidebar, not the card inside it:
-       .queue-layout is a two-column grid, so the whole column travels as
+       the layout is a two-column grid, so the whole column travels as
        one item. */
     .queue-side {
         display: flex;
@@ -170,26 +100,6 @@
         position: sticky;
         top: 5rem;
     }
-    .info-card-title {
-        font-size: .78rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-        color: var(--muted);
-        margin-bottom: .9rem;
-    }
-    .info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: .75rem;
-        padding: .5rem 0;
-        border-bottom: 1px solid var(--border);
-        font-size: .82rem;
-    }
-    .info-row:last-of-type { border-bottom: none; }
-    .info-key { color: var(--muted); flex-shrink: 0; }
-    .info-val { color: var(--text2); text-align: right; word-break: break-all; }
     .dav-url { font-size: .75rem; }
 
     .dav-reveal {
@@ -213,12 +123,6 @@
         user-select: all;
     }
     .dav-actions { display: flex; gap: .6rem; margin-top: .9rem; }
-    .dav-hint {
-        margin-top: .9rem;
-        font-size: .74rem;
-        line-height: 1.5;
-        color: var(--muted);
-    }
 
     @media (max-width: 900px) {
         .queue-layout { grid-template-columns: 1fr; }

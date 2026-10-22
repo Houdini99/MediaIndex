@@ -1,16 +1,11 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Site Logins{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title-group">
-      <div class="page-title">Site Logins</div>
-      <div class="page-sub">The accounts the Discord and Telegram bots download links with</div>
-    </div>
-    {% include '_admin_tabs.html' %}
-  </div>
+  {% call page_header('Site Logins', 'The accounts the Discord and Telegram bots download links with') %}{% include '_admin_tabs.html' %}{% endcall %}
 
   <div class="admin-section">
     <div class="admin-section-title">How this works</div>

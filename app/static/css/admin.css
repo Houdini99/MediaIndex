@@ -1,15 +1,4 @@
 /* ── ADMIN PANEL ─────────────────────────────────────────────────────── */
-    .page-header {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1.75rem;
-        flex-wrap: wrap;
-    }
-    .page-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em; }
-    .page-sub   { font-size: .845rem; color: var(--muted); margin-top: .2rem; }
-
     /* Tabs (Panel | Integrity | Logs) */
     .admin-tabs {
         display: flex;
@@ -43,37 +32,9 @@
         gap: .85rem;
         margin-bottom: 1.5rem;
     }
-    .stat-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1rem 1.1rem;
-        position: relative;
-        overflow: hidden;
-        transition: border-color .15s;
-    }
-    .stat-card:hover { border-color: var(--border2); }
-    .stat-card::after {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, var(--accent), #a855f7);
-        opacity: .7;
-    }
-    .stat-num {
-        font-size: 1.5rem;
-        font-weight: 700;
-        letter-spacing: -.04em;
-        background: linear-gradient(135deg, var(--text) 0%, var(--text2) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        line-height: 1.1;
-        margin-bottom: .25rem;
-        white-space: nowrap;
-    }
-    .stat-label { font-size: .72rem; color: var(--muted); font-weight: 500; letter-spacing: .01em; }
+    .stat-card { padding: 1rem 1.1rem; }
+    .stat-num   { font-size: 1.5rem; white-space: nowrap; }
+    .stat-label { font-size: .72rem; }
 
     /* Sections */
     .admin-section {
@@ -191,17 +152,6 @@
 
     /* Small + danger button variants */
     .btn-sm { padding: .38rem .75rem; font-size: .78rem; }
-    .btn-danger {
-        background: transparent;
-        color: var(--danger);
-        border: 1px solid rgba(248,81,73,.25);
-    }
-    .btn-danger:hover {
-        background: rgba(248,81,73,.1);
-        border-color: rgba(248,81,73,.5);
-        color: #ff7b72;
-    }
-
     /* Dry-run preview */
     .tag-result { margin-top: 1.25rem; }
     .tag-result-scroll {

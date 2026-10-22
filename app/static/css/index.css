@@ -652,8 +652,6 @@
         border-radius: 50%;
         animation: spin .65s linear infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     @media (max-width: 680px) {
         .container { padding: 1rem; }
         .toolbar { padding: .6rem .75rem; }

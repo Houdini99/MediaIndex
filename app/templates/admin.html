@@ -1,16 +1,11 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Admin Panel{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title-group">
-      <div class="page-title">Admin Panel</div>
-      <div class="page-sub">User management, IP bans, and bulk tag operations</div>
-    </div>
-    {% include '_admin_tabs.html' %}
-  </div>
+  {% call page_header('Admin Panel', 'User management, IP bans, and bulk tag operations') %}{% include '_admin_tabs.html' %}{% endcall %}
 
   <!-- ── Overview ──────────────────────────────────────────────────────── -->
   <div class="admin-stats-row">

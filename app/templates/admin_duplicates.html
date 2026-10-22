@@ -1,16 +1,11 @@
 {% extends "base.html" %}
+{% from '_page_header.html' import page_header %}
 {% block title %}MediaIndex — Near Duplicates{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
-  <div class="page-header">
-    <div class="page-title-group">
-      <div class="page-title">Near Duplicates</div>
-      <div class="page-sub">Perceptual fingerprints across the public library — private media is never scanned</div>
-    </div>
-    {% include '_admin_tabs.html' %}
-  </div>
+  {% call page_header('Near Duplicates', 'Perceptual fingerprints across the public library — private media is never scanned') %}{% include '_admin_tabs.html' %}{% endcall %}
 
   <!-- ── Overview ──────────────────────────────────────────────────────── -->
   <div class="admin-stats-row">
