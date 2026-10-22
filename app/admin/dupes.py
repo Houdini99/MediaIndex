@@ -97,19 +97,16 @@ def normalize_params(raw):
         value = (value or '').strip().lower()
         return value if value in choices else default
 
+    def _int(key, default):
+        try:
+            return int(raw.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
     types = [t for t in (raw.get('types') or '').split(',') if t in TYPES]
-    try:
-        threshold = int(raw.get('threshold', DEFAULT_THRESHOLD))
-    except (TypeError, ValueError):
-        threshold = DEFAULT_THRESHOLD
-    try:
-        frames = int(raw.get('video_frames', DEFAULT_VIDEO_FRAMES))
-    except (TypeError, ValueError):
-        frames = DEFAULT_VIDEO_FRAMES
-    try:
-        min_group = int(raw.get('min_group', 2))
-    except (TypeError, ValueError):
-        min_group = 2
+    threshold = _int('threshold', DEFAULT_THRESHOLD)
+    frames = _int('video_frames', DEFAULT_VIDEO_FRAMES)
+    min_group = _int('min_group', 2)
     return {
         'source': _one_of(raw.get('source'), SOURCES, 'thumb'),
         'algo': _one_of(raw.get('algo'), ALGOS, 'phash'),

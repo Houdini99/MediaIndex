@@ -185,11 +185,12 @@ def remove_user(user_id):
     if user_id == g.user['id']:
         flash('You cannot delete your own account.', 'warning')
         return redirect(url_for('admin.panel'))
-    if not fetch_user_by_id(user_id):
+    user = fetch_user_by_id(user_id)
+    if not user:
         flash('User not found.', 'danger')
         return redirect(url_for('admin.panel'))
 
-    username = fetch_user_by_id(user_id)[1]
+    username = user[1]
     # What happens to the user's media: 'delete' or 'reassign:<user_id>'.
     action = request.form.get('media_action', 'delete')
     if action.startswith('reassign:'):
@@ -197,12 +198,14 @@ def remove_user(user_id):
             target_id = int(action.split(':', 1)[1])
         except ValueError:
             target_id = None
-        if not target_id or target_id == user_id or not fetch_user_by_id(target_id):
+        target = (fetch_user_by_id(target_id)
+                  if target_id and target_id != user_id else None)
+        if not target:
             flash('Invalid reassignment target.', 'danger')
             return redirect(url_for('admin.panel'))
         n = _reassign_user_media(user_id, target_id)
         detail = f'{n} media item(s) reassigned.'
-        media = f'{n} given to {fetch_user_by_id(target_id)[1]}'
+        media = f'{n} given to {target[1]}'
     else:
         n = delete_media_for_user(user_id)
         detail = f'{n} media item(s) deleted.'
@@ -237,10 +240,10 @@ def change_password(user_id):
         # The reset logged out every session of that user — including this
         # one, when an admin resets their own password. Keep the browser
         # that made the change signed in; every other copy stays revoked.
-        log_event('password_reset', user=fetch_user_by_id(user_id)[1],
-                  by=g.user['username'])
+        user = fetch_user_by_id(user_id)
+        log_event('password_reset', user=user[1], by=g.user['username'])
         if own:
-            session['gen'] = fetch_user_by_id(user_id)[3]
+            session['gen'] = user[3]
             flash('Password updated.', 'success')
         else:
             flash('Password updated. They will choose their own when they '

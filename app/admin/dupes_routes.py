@@ -35,17 +35,10 @@ _GROUPS_PER_PAGE = 20
 
 
 def _dupe_params():
-    """Scan/grouping parameters from the query string, normalized."""
-    return dupes.normalize_params({
-        'source': request.args.get('source'),
-        'algo': request.args.get('algo'),
-        'threshold': request.args.get('threshold'),
-        'types': request.args.get('types'),
-        'video_frames': request.args.get('video_frames'),
-        'min_group': request.args.get('min_group'),
-        'cross_uploader_only': request.args.get('cross_uploader_only'),
-        'sort': request.args.get('sort'),
-    })
+    """Scan/grouping parameters from the query string, normalized. Keys
+    normalize_params does not know (`page`) are ignored, and so is a stray
+    `rehash`: only a scan reads it."""
+    return dupes.normalize_params(request.args)
 
 
 def _quarantine_selection():
@@ -80,16 +73,9 @@ def duplicates():
 @admin_bp.route('/duplicates/scan', methods=('POST',))
 @admin_required
 def duplicates_scan():
-    params = dupes.normalize_params({
-        'source': request.form.get('source'),
-        'algo': request.form.get('algo'),
-        'threshold': request.form.get('threshold'),
-        'types': ','.join(request.form.getlist('types')),
-        'video_frames': request.form.get('video_frames'),
-        'min_group': request.form.get('min_group'),
-        'rehash': request.form.get('rehash'),
-        'sort': request.form.get('sort'),
-    })
+    # The form sends one `types` field per ticked box.
+    params = dupes.normalize_params(
+        {**request.form, 'types': ','.join(request.form.getlist('types'))})
     job_id, message = dupes.start_scan(params, g.user['id'])
     flash(message, 'success' if job_id else 'warning')
     return redirect(url_for('admin.duplicates', **_dupe_query(params)))
@@ -97,15 +83,8 @@ def duplicates_scan():
 
 def _dupe_query(params):
     """Parameters as query-string arguments, so the page keeps its view."""
-    return {
-        'source': params['source'],
-        'algo': params['algo'],
-        'threshold': params['threshold'],
-        'types': ','.join(params['types']),
-        'video_frames': params['video_frames'],
-        'min_group': params['min_group'],
-        'sort': params['sort'],
-    }
+    keys = ('source', 'algo', 'threshold', 'video_frames', 'min_group', 'sort')
+    return {**{k: params[k] for k in keys}, 'types': ','.join(params['types'])}
 
 
 @admin_bp.route('/duplicates/cancel', methods=('POST',))

@@ -3,6 +3,7 @@ two-step (quarantine → purge) resolve flow."""
 import io
 import os
 import time
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from PIL import Image
@@ -574,6 +575,34 @@ def test_scan_route_starts_a_job_and_status_reports_it(admin_client, admin):
         time.sleep(0.05)
     status = admin_client.get('/admin/duplicates/status').get_json()
     assert status['state'] == 'done' and status['coverage']['hashed'] == 1
+
+
+def test_scan_route_reads_every_ticked_type_and_keeps_the_view(admin_client, monkeypatch):
+    started = []
+    monkeypatch.setattr(dupes, 'start_scan',
+                        lambda params, uid: started.append(params) or (None, 'busy'))
+    resp = admin_client.post('/admin/duplicates/scan', data={
+        'source': 'file', 'types': ['image', 'video'], 'threshold': '5',
+        'min_group': '3', 'sort': 'size', 'video_frames': '9', 'algo': 'dhash',
+        'rehash': '1'})
+
+    assert started[0]['types'] == ['image', 'video'] and started[0]['rehash'] is True
+    assert not started[0]['cross_uploader_only']
+    query = parse_qs(urlsplit(resp.headers['Location']).query)
+    assert query == {'source': ['file'], 'algo': ['dhash'], 'threshold': ['5'],
+                     'video_frames': ['9'], 'min_group': ['3'], 'sort': ['size'],
+                     'types': ['image,video']}
+
+
+def test_the_groups_view_reads_the_query_string_as_is(admin_client, monkeypatch):
+    seen = []
+    real = dupes.find_groups
+    monkeypatch.setattr(dupes, 'find_groups',
+                        lambda params: seen.append(params) or real(params))
+    admin_client.get('/admin/duplicates/groups?threshold=3&types=gif,video'
+                     '&cross_uploader_only=on&page=2&rehash=1')
+    assert seen[0]['threshold'] == 3 and seen[0]['types'] == ['gif', 'video']
+    assert seen[0]['cross_uploader_only'] is True
 
 
 def test_resolve_route_validates_its_body(admin_client):

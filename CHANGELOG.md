@@ -75,7 +75,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   read their filters in one place, and a private file is served after
   one database lookup instead of two; files are deleted through one
   helper (`app/files.py`), with one function each for a media item's
-  files and a staged thumbnail; the database modules lost their
+  files and a staged thumbnail; the duplicate finder reads its settings
+  in one place, and the admin's user actions look each account up once;
+  the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.

@@ -126,6 +126,39 @@ def test_reassigned_private_media_opens_with_the_new_owners_key(client, admin):
     assert thumb.startswith(b'\x89PNG')
 
 
+@pytest.mark.parametrize('target', ['self', 'missing', 'junk'])
+def test_an_invalid_reassignment_target_deletes_nothing(client, admin, target):
+    carol = _create('carol')
+    mid = _image(carol, 'olive')
+    action = {'self': f'reassign:{carol}', 'missing': 'reassign:99999',
+              'junk': 'reassign:x'}[target]
+
+    resp = client.post(f'/admin/users/{carol}/delete',
+                       data={'media_action': action}, follow_redirects=True)
+
+    assert b'Invalid reassignment target.' in resp.data
+    assert fetch_user_by_id(carol) is not None
+    from app.media.db import get_media_by_id
+    assert get_media_by_id(mid) is not None
+
+
+def test_user_routes_look_each_account_up_once(client, admin, monkeypatch):
+    import app.admin.routes as admin_routes
+    calls = []
+    real = admin_routes.fetch_user_by_id
+    monkeypatch.setattr(admin_routes, 'fetch_user_by_id',
+                        lambda uid: calls.append(uid) or real(uid))
+    carol, dave = _create('carol'), _create('dave')
+
+    client.post(f'/admin/users/{carol}/delete',
+                data={'media_action': f'reassign:{dave}'})
+    assert calls == [carol, dave]
+
+    calls.clear()
+    client.post(f'/admin/users/{dave}/password', data={'password': 'long-enough'})
+    assert calls == [dave]
+
+
 def test_existing_databases_get_the_constraint_rewritten(app):
     """CREATE TABLE IF NOT EXISTS never revisits a table, so databases
     created before the fix carry the old NO ACTION constraints; boot must
