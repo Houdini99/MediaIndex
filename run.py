@@ -1,7 +1,8 @@
-"""Clean entry point for the Docker container.
+"""Entry point: the container's gunicorn serves `run:app`.
 
 Calling pattern:
-  python run.py                        # local dev / Docker CMD
+  gunicorn run:app                     # Docker CMD (see the Dockerfile)
+  python run.py                        # local dev server
   flask --app run:app run ...          # Flask CLI also works (app is exposed)
 """
 import os

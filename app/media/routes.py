@@ -483,8 +483,7 @@ def _shuffled_feed_ids(seed, ft, search, exclude_tags, include_tags, viewer_id):
 @media_bp.route('/api/feed')
 @login_required
 def api_feed():
-    # `types` (comma-separated) takes precedence over the legacy single `type`.
-    ft = request.args.get('types') or request.args.get('type', 'all')
+    ft = request.args.get('types') or 'all'     # comma-separated
     search = request.args.get('search', '')
     include_tags = request.args.get('include_tags', '')
     hide_ai = request.args.get('hide_ai', '')

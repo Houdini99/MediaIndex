@@ -372,7 +372,7 @@ def _progress_hook(url, ctl=None):
     — keeps advancing and never trips it; only a truly stuck transfer
     does. Raising here aborts yt-dlp's download loop from the inside, so
     the transfer actually stops instead of running on in an orphaned
-    thread (contrast the old total-time cap)."""
+    thread."""
     state = {'next': 0.0, 'advanced': None, 'bytes': -1}
     stall = ctl.get('stall') if ctl else None
 
@@ -666,10 +666,11 @@ def _final_path(info, pattern):
 
     yt-dlp reports it in `requested_downloads` — for a merged download the
     last entry is the muxed output, not one of the source streams. The
-    glob is only a fallback (older/fake yt-dlp): picking sorted(glob)[0]
-    on its own is unsafe, because 'ytdlp-<t>.f137.mp4' sorts *before*
-    'ytdlp-<t>.mp4', so a leftover video-only stream from a failed merge
-    would win and be ingested silent.
+    glob is only a fallback for an info dict without that list (the test
+    fakes build one without it): picking sorted(glob)[0] on its own is
+    unsafe, because 'ytdlp-<t>.f137.mp4' sorts *before* 'ytdlp-<t>.mp4',
+    so a leftover video-only stream from a failed merge would win and be
+    ingested silent.
     """
     for entry in reversed(info.get('requested_downloads') or []):
         path = entry.get('filepath') or entry.get('_filename')

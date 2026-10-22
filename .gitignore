@@ -21,6 +21,8 @@ log/
 data/
 # WebDAV inbox: users' staged uploads (staging/<user_id>/)
 staging/
+# A stray SQLite file: the app runs on Postgres, but a local tool or an
+# old checkout can leave one, and it must never be committed.
 *.db
 *.db-wal
 *.db-shm

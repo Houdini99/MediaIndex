@@ -69,6 +69,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.
 
+### Removed
+
+- `/api/feed` no longer reads the old single `type` parameter, only
+  `types` (the feed page and `docs/api.md` already used only `types`).
+- `FLASK_APP` is no longer set in the image or the example compose;
+  nothing used it. A stack that copied it can drop the line. For the
+  Flask command line, use `flask --app run:app`.
+
 ### Fixed
 
 - The Telegram bot gave no answer at all when the index's reply to its

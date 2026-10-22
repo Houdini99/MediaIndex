@@ -20,7 +20,7 @@ Redis holds two keys, so a restart resumes the queue:
   time the next attempt is due) — ZADD re-scores an existing member, so a
   message can never be queued twice;
 * a hash of the same members to their JSON state (attempt count, the
-  reason last time, when it was first queued).
+  reason last time, the tags).
 
 Every method is best-effort: Redis being down must never break ingestion,
 so failures are logged and reported as "nothing queued" / "nothing due".
@@ -84,8 +84,7 @@ class RetryQueue:
                             'message_id': message_id,
                             'attempts': attempts,
                             'reason': reason,
-                            'tags': list(tags or []),
-                            'queued_at': time.time()})
+                            'tags': list(tags or [])})
         try:
             pipe = self._r().pipeline()
             pipe.zadd(self._key, {member: time.time() + delay})
@@ -132,7 +131,6 @@ class RetryQueue:
                                 member)
                 continue
             entry['attempts'] = entry.get('attempts', 0) + 1
-            entry['max_attempts'] = self._max_attempts
             entries.append(entry)
         return entries
 

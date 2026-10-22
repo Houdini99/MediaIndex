@@ -96,7 +96,9 @@ class _Item:
     @classmethod
     def from_entry(cls, entry):
         # .get() on file_id, url and key: a link has no file_id, and an
-        # entry parked by an older build has neither of the other two.
+        # entry parked before url and key existed has neither. Such an
+        # entry can outlive an upgrade: PENDING_TTL is per user and starts
+        # over with every item that user parks.
         return cls(entry.get('file_id'), entry['filename'], entry['ext'],
                    entry.get('size') or 0, entry['message_id'], None,
                    url=entry.get('url'), key=entry.get('key'))

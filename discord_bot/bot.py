@@ -932,8 +932,8 @@ class IndexBot(discord.Client):
     def _duplicate_note(result):
         """Human line for a rejected duplicate.
 
-        In API mode the index names the item the file collided with, so
-        say which one and link it. A private collision is reported without
+        The index names the item the file collided with, so say which one
+        and link it. A private collision is reported without
         its tags or owner — the index withholds them on purpose, and a
         Discord channel is the wrong place to learn what is sitting in
         someone else's private library.

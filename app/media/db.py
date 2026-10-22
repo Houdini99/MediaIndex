@@ -410,8 +410,9 @@ def delete_media(mid, user_id, is_admin=False):
         # broken gallery item. This way the worst case is an orphaned file,
         # which the admin integrity check finds and cleans up.
         conn.execute("DELETE FROM media.media WHERE id=%s", (mid,))
-    # Resolve against the configured folders so legacy relative/absolute
-    # stored paths still delete the real file (same pattern as serving).
+    # media_path/thumb_path keep only the file name, so the real file in the
+    # configured folders is deleted whatever form the stored value has
+    # (same as serving).
     _remove_files(row[0], row[1])
     return True
 

@@ -128,12 +128,13 @@ def test_junk_seed_does_not_error(client, logged_in):
 
 
 # ── Filtering ──────────────────────────────────────────────────────────────
-def test_types_takes_precedence_over_legacy_type(client, logged_in):
+def test_types_filters_and_the_old_single_type_is_ignored(client, logged_in):
     _seed_media(logged_in, 3, ext='png', start=0)
     _seed_media(logged_in, 2, ext='mp4', start=10)
-    payload = _page(client, seed=1, page=1, types='video', type='image')
+    payload = _page(client, seed=1, page=1, types='video')
     assert {m['type'] for m in payload['media']} == {'video'}
     assert payload['total'] == 2
+    assert _page(client, seed=1, page=1, type='video')['total'] == 5
 
 
 def test_unknown_type_values_are_ignored_not_matched(client, logged_in):

@@ -138,7 +138,6 @@ def test_due_claims_ready_entries_and_increments_attempts(queue):
     assert entry['message_id'] == 2
     assert entry['attempts'] == 2               # counts the attempt about to run
     assert entry['tags'] == ['cats']
-    assert entry['max_attempts'] == 3
 
 
 def test_claiming_removes_the_entry_from_redis(queue):

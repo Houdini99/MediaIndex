@@ -36,7 +36,6 @@ services:
       # WebDAV inbox: per-user staging folders (staging/<user_id>/).
       - ${INDEX_ROOT:-.}/staging:/app/staging
     environment:
-      - FLASK_APP=run.py
       # Set SECRET_KEY as a stack environment variable in Portainer
       # (or in ./.env for local `docker compose`, which substitutes it).
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required — set it in the stack environment}

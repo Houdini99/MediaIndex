@@ -24,7 +24,6 @@ COPY app ./app
 COPY scripts ./scripts
 
 # Set environment variables
-ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5001
