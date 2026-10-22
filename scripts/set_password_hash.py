@@ -46,9 +46,11 @@ def looks_like_hash(h: str):
                        "the shell likely ate part of it (double quotes expand $).")
     method, salt, digest = h.split('$', 2)
     scheme = method.split(':', 1)[0]
-    if scheme not in {'scrypt', 'pbkdf2', 'plain'}:
+    # The only schemes Werkzeug's check_password_hash accepts; anything else
+    # stored here would make that user's every login attempt fail.
+    if scheme not in {'scrypt', 'pbkdf2'}:
         return False, f"unrecognized hash scheme {scheme!r}; expected 'scrypt' or 'pbkdf2'."
-    if scheme != 'plain' and not salt:
+    if not salt:
         return False, "salt segment is empty — the hash looks truncated."
     if not digest:
         return False, "hash segment is empty."

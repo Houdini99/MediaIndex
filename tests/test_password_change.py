@@ -93,6 +93,20 @@ def test_cli_reset_leaves_the_flag_alone(app):
     assert _must_change(bob) is True
 
 
+def test_set_password_hash_only_stores_what_logins_can_check(monkeypatch):
+    """A hash Werkzeug cannot check (its old 'plain' scheme) would turn
+    every login of that user into a 500, so the script must refuse it."""
+    import os
+    monkeypatch.syspath_prepend(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'scripts'))
+    from set_password_hash import looks_like_hash
+    for method in ('scrypt', 'pbkdf2:sha256'):
+        assert looks_like_hash(generate_password_hash('pw', method))[0]
+    assert not looks_like_hash('plain$$pw')[0]
+    assert not looks_like_hash('scrypt:32768:8:1$$deadbeef')[0]   # salt lost
+
+
 def test_registered_accounts_are_not_asked(app, client, monkeypatch):
     """The first admin registers with a password they chose themselves."""
     from app.config import Config
