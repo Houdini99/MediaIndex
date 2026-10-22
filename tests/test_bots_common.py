@@ -14,8 +14,10 @@ import pytest
 
 import bots_common.download as common_download
 import bots_common.parsing as common_parsing
+from discord_bot import config as discord_config
 from discord_bot import download as discord_download
 from discord_bot import parsing as discord_parsing
+from telegram_bot import config as telegram_config
 from telegram_bot import download as telegram_download
 from telegram_bot import parsing as telegram_parsing
 
@@ -39,6 +41,12 @@ def test_both_bots_download_with_the_shared_fetch():
     assert telegram_download.fetch is common_download.fetch
 
 
+@pytest.mark.parametrize('config', [discord_config, telegram_config])
+def test_both_bots_accept_the_shared_file_types(config):
+    assert config.IMAGE_EXT is common_parsing.IMAGE_EXT
+    assert config.ALLOWED_EXT is common_parsing.ALLOWED_EXT
+
+
 def test_no_private_copies_came_back():
     for bot in ('discord_bot', 'telegram_bot'):
         assert not (REPO / bot / 'resolver.py').exists(), (
@@ -48,3 +56,10 @@ def test_no_private_copies_came_back():
             assert f'\ndef {name}(' not in src, (
                 f"{bot}/parsing.py defines {name} again — it lives in "
                 "bots_common/parsing.py")
+        src = (REPO / bot / 'config.py').read_text()
+        for name in ('_require', '_num'):
+            assert f'\ndef {name}(' not in src, (
+                f"{bot}/config.py defines {name} again — use "
+                "bots_common/env.py")
+        assert ".lower() != 'false'" not in src, (
+            f"{bot}/config.py reads a switch by hand — use env.flag()")

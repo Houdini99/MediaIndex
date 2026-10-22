@@ -15,6 +15,12 @@ _NOT_TAGS_RE = re.compile(r'https?://|<[^>]+>')
 
 _URL_RE = re.compile(r'https?://[^\s<>]+')
 
+# What the index accepts. Must mirror the app's allow-lists (app/config.py),
+# which the bots cannot import, so an unsupported file is skipped here
+# instead of after a wasted download and upload.
+IMAGE_EXT = frozenset({'jpg', 'jpeg', 'png', 'webp', 'gif'})
+ALLOWED_EXT = IMAGE_EXT | {'mp4', 'webm', 'avi', 'mov', 'mkv'}
+
 
 def extract_urls(text):
     """http(s) URLs in a message, tolerating Discord's <no-embed> wrapping

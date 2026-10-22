@@ -27,8 +27,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The gallery, feed and lightbox APIs read each item's stored type instead
   of working it out from the file name for every row, and the duplicate
   finder counts items per type in one query.
+- A `DISCORD_LOG_CHANNEL_ID` that is not a number now stops the Discord
+  bot at startup with a message naming the variable, like the bots' other
+  number settings. Before, it turned the log channel off without a word.
 - Code clean-up from an audit, with no change in behaviour: dead code
-  removed; the bots share one download path, and the app one helper each
+  removed; the bots share one download path and one module that reads
+  their settings (`bots_common/env.py`), and the app one helper each
   for decrypting a private file, parsing id lists and checking the bots'
   API accounts; the database modules lost their wrapper and set-up
   functions; the pages share one header, one set of card and button

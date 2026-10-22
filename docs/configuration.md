@@ -104,7 +104,7 @@ See [Discord bot](discord-bot.md) for what each feature does, and
 | `DISCORD_LOOKUP_TTL` | no | `60` | Seconds the bot caches which index account a Discord user is linked to. |
 | `DISCORD_FORWARD_TAG_WAIT` | no | `15` | Seconds an untagged forward waits for a follow-up message with its tags. `0` doesn't wait. |
 | `DISCORD_LINK_MAX_MB` | no | `512` | Size limit for a file downloaded from a link or an embed, in MB. Attachments are limited by Discord's own upload limit instead. |
-| `DISCORD_LOG_CHANNEL_ID` | no | — | Channel for status lines (startup, each ingest result, failures). Unset turns it off. |
+| `DISCORD_LOG_CHANNEL_ID` | no | — | Channel for status lines (startup, each ingest result, failures). Unset turns it off; a value that is not a number stops the bot at startup. |
 | `DISCORD_NOTIFY_THUMBNAIL_ONLY` | no | `false` | `true` always attaches the thumbnail to an announcement, never the original file. |
 
 **Retries**
