@@ -22,6 +22,8 @@ import types
 
 import pytest
 
+from bots_common.download import TooLarge
+from bots_common.sniff import Blocked
 from discord_bot import bot as botmod
 from discord_bot import config
 from discord_bot.index_client import AuthError, IndexUnavailable, UploadResult
@@ -322,6 +324,31 @@ def test_owner_lookups_are_cached_but_outages_are_not(bot):
     bot.index.lookup_error = None
     bot.index.links[99] = 'bob'
     assert run(bot._owner_for(99)) == 'bob'
+
+
+# ── Refused downloads ─────────────────────────────────────────────────────
+def _failing_download(bot, error):
+    async def download(att, dest):
+        raise error
+    bot._downloader = types.SimpleNamespace(download=download)
+
+
+def test_a_link_to_an_internal_host_is_refused_and_says_why(bot):
+    _failing_download(bot, Blocked(
+        "web is not a public address, so I won't fetch it"))
+    outcome = run(bot._ingest(_att(), channel_message(), []))
+    assert outcome.emoji == botmod.UNSUPPORTED and not outcome.retryable
+    assert bot.index.uploads == []
+    assert 'not a public address' in bot.logs[0]
+
+
+def test_a_link_over_the_cap_is_refused_with_both_sizes(bot, monkeypatch):
+    monkeypatch.setattr(config, 'LINK_MAX_BYTES', 512_000_000)
+    _failing_download(bot, TooLarge(900_000_000))
+    outcome = run(bot._ingest(_att(), channel_message(), []))
+    assert outcome.emoji == botmod.UNSUPPORTED and not outcome.retryable
+    assert bot.index.uploads == []
+    assert '(900 MB) is over the 512 MB link limit' in bot.logs[0]
 
 
 # ── Where status lines go ─────────────────────────────────────────────────

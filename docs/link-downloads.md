@@ -112,7 +112,7 @@ startup line says whether PO tokens are on.
 
 | Limit | Discord | Telegram |
 |---|---|---|
-| Direct file links | none | `TELEGRAM_LINK_MAX_MB` (512 MB) |
+| Direct file links | `DISCORD_LINK_MAX_MB` (512 MB) | `TELEGRAM_LINK_MAX_MB` (512 MB) |
 | yt-dlp downloads | `DISCORD_YTDLP_MAX_MB` (512 MB) | `TELEGRAM_YTDLP_MAX_MB` (512 MB) |
 | No progress for | `DISCORD_YTDLP_STALL_TIMEOUT` (120 s) | `TELEGRAM_YTDLP_STALL_TIMEOUT` (120 s) |
 | Not downloading yet after | `DISCORD_YTDLP_MAX_DURATION` (1800 s) | `TELEGRAM_YTDLP_MAX_DURATION` (1800 s) |
@@ -127,10 +127,10 @@ The bots run inside the stack's networks, so a link must not be able to
 point them at the web app, the database or anything else on the server.
 
 - Before the `HEAD` request in step 3, the generic-extractor check in step
-  4, and every direct download in the Telegram bot, the host is looked up
-  and refused unless all its addresses are public. Loopback, private
-  ranges, link-local addresses such as `169.254.169.254`, and IPv6
-  unique-local addresses are refused.
+  4, and every direct download (including the Discord bot's attachments
+  and embeds), the host is looked up and refused unless all its addresses
+  are public. Loopback, private ranges, link-local addresses such as
+  `169.254.169.254`, and IPv6 unique-local addresses are refused.
 - Redirects are followed one hop at a time, and every hop is checked again.
 - Only members with the Discord ingest role, and only linked users in
   Telegram, can make a bot fetch anything at all.

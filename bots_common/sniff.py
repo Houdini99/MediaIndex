@@ -13,7 +13,7 @@ the filename in Content-Disposition, when there is one) decides.
 Both bots use it (sniff_many, at most MAX_PER_MESSAGE links each time).
 That makes a bot request a URL it was handed, from inside the stack's
 networks, so every hop goes through require_public first — the same bar
-the Telegram bot's link downloader sets on every download.
+bots_common/download.py sets on every download.
 """
 import asyncio
 import email.message

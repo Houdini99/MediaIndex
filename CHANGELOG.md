@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- The Discord bot now checks every link it downloads, attachments and
+  embeds included, against the same public-address rule as the bots'
+  other link paths, one redirect hop at a time. Before, a link ending in a
+  media extension was fetched without it, so a member with the ingest
+  role could make the bot fetch a service inside the stack.
+- Files from links and embeds in Discord are capped at
+  `DISCORD_LINK_MAX_MB` (512 MB).
+
 ## [1.0.0] — 2026-10-21
 
 ### Initial Stable Release Summary
@@ -105,4 +117,5 @@ a network folder, Discord and Telegram.
 
 See [Security model](docs/security.md#known-limitations) for details.
 
+[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/Houdini99/MediaIndex/releases/tag/v1.0.0

@@ -1,4 +1,4 @@
-"""Downloading media off the Discord CDN.
+"""Downloading the media a Discord message carries.
 
 Split out of discord_bot/bot.py, which held the gateway client, this
 downloader, the retry driver, the reaction vocabulary and the log-channel
@@ -6,23 +6,27 @@ formatting in one 712-line module. Nothing here
 touches Discord's gateway or the bot's own state — it owns one aiohttp
 session and knows how to get bytes onto disk — so it lifts out whole.
 
-Two non-obvious behaviours it exists to preserve:
+The fetch itself is bots_common/download.py, shared with the Telegram
+bot: streamed to disk in 1 MiB chunks (discord.py's `att.save()` would
+read a large forwarded video into memory first), and public addresses
+only on every redirect hop. That last part matters for links: a message
+may carry any URL, and this container sits on `proxy` and `backend`.
 
-  * **Streaming, not buffering.** discord.py's `att.save()` reads the whole
-    file into memory first, which turns one large forwarded video into an
-    OOM risk for the container. Everything here goes to disk in 1 MiB
-    chunks.
+What this module adds on top:
+
+  * **A cap for links.** A URL on Discord's own CDN is an attachment,
+    already bounded by Discord's upload limit; anything else is capped at
+    DISCORD_LINK_MAX_MB.
   * **Re-signing.** Discord serves attachments behind short-lived signed
     URLs, and forwarded or embedded media often arrives as a bare,
     already-invalid link. A 403/404 from a Discord CDN host is therefore
     not fatal: ask Discord to re-sign the URL and try once more.
 """
 import logging
-import time
 
 import aiohttp
 
-from bots_common import resolver
+from bots_common.download import fetch
 
 from . import config, parsing
 
@@ -58,30 +62,11 @@ class CdnDownloader:
             self._session = None
 
     async def stream(self, url, dst, label):
-        """Stream a URL to disk in 1 MiB chunks (reopens dst each call, so a
-        retry cleanly overwrites a partial first attempt). Progress lands in
-        the log every few seconds so a big download never looks like a hang;
-        quick ones stay silent."""
-        async with self.session().get(url) as resp:
-            resp.raise_for_status()
-            total = resp.content_length
-            done = 0
-            started = time.monotonic()
-            next_log = started + resolver.PROGRESS_INTERVAL
-            with open(dst, 'wb') as fh:
-                async for chunk in resp.content.iter_chunked(1 << 20):
-                    fh.write(chunk)
-                    done += len(chunk)
-                    now = time.monotonic()
-                    if now >= next_log:
-                        next_log = now + resolver.PROGRESS_INTERVAL
-                        logging.info(
-                            "download: %s — %s", label,
-                            parsing.format_progress(done, total,
-                                                    done / (now - started)))
-            if time.monotonic() - started >= resolver.PROGRESS_INTERVAL:
-                logging.info("download: %s — complete (%.1f MB)",
-                             label, done / 1e6)
+        """Stream a URL to disk, capped unless it is on Discord's CDN.
+        Raises sniff.Blocked, download.TooLarge (bots_common) or aiohttp's
+        own errors."""
+        cap = None if parsing.is_discord_cdn(url) else config.LINK_MAX_BYTES
+        await fetch(self.session(), url, dst, label, cap)
 
     async def download(self, src, dst):
         """Download one source to disk, re-signing an expired Discord CDN

@@ -93,6 +93,7 @@ app/
   templates/, static/  Jinja2 templates, CSS and plain JavaScript (no build step)
 bots_common/           shared by both bots: yt-dlp resolver, link and tag
                        parsing, sniff.py (link probing and address checks),
+                       download.py (checked, capped downloads),
                        site_logins.py, ytdlp_fixes.py (extractor stopgaps)
 discord_bot/           the Discord bot (its own image)
 telegram_bot/          the Telegram bot (its own image)

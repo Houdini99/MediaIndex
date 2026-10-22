@@ -116,9 +116,10 @@ The bot reads messages in the ingest channel from members holding
   image links Discord previews. If an embed isn't there yet, the bot looks
   at the message once more a few seconds later.
 
-Large files are streamed to disk, not held in memory. Discord's file links
-expire; when one has, the bot asks Discord for a fresh link and tries
-again.
+Large files are streamed to disk, not held in memory. A file from a link
+or an embed may be at most `DISCORD_LINK_MAX_MB` (512 MB). Discord's file
+links expire; when one has, the bot asks Discord for a fresh link and
+tries again.
 
 **Tags.** Every item gets `DISCORD_INGEST_TAGS` (`discord`). If the
 message text looks like a tag list (`cats,funny`, or a single word without

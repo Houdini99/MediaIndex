@@ -495,24 +495,24 @@ def test_a_link_resolving_to_a_private_address_is_refused(monkeypatch,
                                                           address):
     _resolving(monkeypatch, {'internal.example': [address]})
     with pytest.raises(download.Blocked):
-        download._require_public('http://internal.example/x.jpg')
+        sniff.require_public('http://internal.example/x.jpg')
 
 
 def test_a_public_address_is_allowed(monkeypatch):
     _resolving(monkeypatch, {'example.com': ['93.184.216.34']})
-    download._require_public('https://example.com/x.jpg')     # no raise
+    sniff.require_public('https://example.com/x.jpg')     # no raise
 
 
 def test_one_private_record_among_public_ones_still_refuses(monkeypatch):
     """Checking only the first answer would make this a coin flip."""
     _resolving(monkeypatch, {'mixed.example': ['93.184.216.34', '127.0.0.1']})
     with pytest.raises(download.Blocked):
-        download._require_public('http://mixed.example/x.jpg')
+        sniff.require_public('http://mixed.example/x.jpg')
 
 
 def test_a_non_http_scheme_is_refused():
     with pytest.raises(download.Blocked):
-        download._require_public('file:///etc/passwd')
+        sniff.require_public('file:///etc/passwd')
 
 
 def test_a_redirect_into_an_internal_host_is_refused(monkeypatch, tmp_path):
@@ -546,7 +546,7 @@ def test_a_redirect_loop_gives_up(monkeypatch, tmp_path):
     dl = _downloader(
         monkeypatch, {'a.example': ['93.184.216.34']},
         [_FakeResponse(302, {'Location': 'https://a.example/cat.gif'})
-         for _ in range(download.MAX_REDIRECTS + 1)])
+         for _ in range(sniff.MAX_REDIRECTS + 1)])
     with pytest.raises(download.Blocked):
         run(dl.download('https://a.example/cat.gif', tmp_path / 'out',
                         'cat.gif', 1_000_000))

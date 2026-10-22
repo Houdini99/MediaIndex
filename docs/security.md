@@ -189,9 +189,6 @@ Redis requires a password. Only the web app is published, on loopback.
 - **DNS rebinding.** The address checks look up a host before the request.
   A server that answers differently between the check and the request can
   get around them.
-- **Discord direct links.** A link in a Discord message that ends in a
-  media file extension is downloaded without the address check that the
-  bots' other link paths go through. The ingest role is the control there.
 - **Tags are one text field per item.** Searching scans that field, which
   is fast for a personal library but would need a different design for
   hundreds of thousands of items.

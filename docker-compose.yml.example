@@ -205,6 +205,9 @@ services:
       # Seconds an untagged forward waits for the author's follow-up tag
       # message before ingesting (0 = don't wait).
       - DISCORD_FORWARD_TAG_WAIT=${DISCORD_FORWARD_TAG_WAIT:-15}
+      # Size cap (MB) for a file downloaded from a link or embed. Attachments
+      # are bounded by Discord's own upload limit instead.
+      - DISCORD_LINK_MAX_MB=${DISCORD_LINK_MAX_MB:-512}
       # Optional bot-logs channel: status lines for startup, each ingest
       # result, tag matches, and failures. Empty = disabled.
       - DISCORD_LOG_CHANNEL_ID=${DISCORD_LOG_CHANNEL_ID:-}

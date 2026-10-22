@@ -12,8 +12,8 @@ import pathlib
 
 import pytest
 
+import bots_common.download as common_download
 import bots_common.parsing as common_parsing
-import bots_common.resolver as common_resolver
 from discord_bot import download as discord_download
 from discord_bot import parsing as discord_parsing
 from telegram_bot import download as telegram_download
@@ -32,9 +32,11 @@ def test_both_bots_parse_with_the_shared_code(name):
     assert getattr(telegram_parsing, name) is shared
 
 
-def test_both_bots_resolve_with_the_shared_resolver():
-    assert discord_download.resolver is common_resolver
-    assert telegram_download.resolver is common_resolver
+def test_both_bots_download_with_the_shared_fetch():
+    """The address check and the cap live in one place, so neither bot can
+    fetch a link without them."""
+    assert discord_download.fetch is common_download.fetch
+    assert telegram_download.fetch is common_download.fetch
 
 
 def test_no_private_copies_came_back():

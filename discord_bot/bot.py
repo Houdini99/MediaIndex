@@ -32,6 +32,7 @@ import aiohttp
 import discord
 
 from bots_common import resolver, site_logins, sniff
+from bots_common.download import TooLarge
 
 from . import config, download, notifier, parsing, retry
 from .index_client import AuthError, IndexClient, IndexUnavailable
@@ -934,6 +935,17 @@ class IndexBot(discord.Client):
             reason = f"couldn't look up who posted it — {e}"
             await self._report(message, f"❌ {label} — {reason}")
             return _Outcome(ERROR, True, reason)
+        except sniff.Blocked as e:
+            # A link to a host that isn't on the public internet. Say which,
+            # since the sender may simply have pasted a LAN URL by accident.
+            await self._report(message, f"🚫 {label} — {e}")
+            return _Outcome(UNSUPPORTED)
+        except TooLarge as e:
+            size = f" ({e.size / 1e6:.0f} MB)" if e.size else ""
+            await self._report(
+                message, f"🚫 {label}{size} is over the "
+                f"{config.LINK_MAX_BYTES / 1e6:.0f} MB link limit")
+            return _Outcome(UNSUPPORTED)
         except aiohttp.ClientResponseError as e:
             logging.warning("ingest: download of %s failed HTTP %s",
                             att.filename, e.status)

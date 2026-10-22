@@ -110,6 +110,11 @@ FORWARD_TAG_WAIT = _num('DISCORD_FORWARD_TAG_WAIT', 15)
 # host) may arrive before its embed exists. Re-fetch the message once after
 # this many seconds when a link yielded no ingestible media yet.
 EMBED_UNFURL_WAIT = 3.0
+# Cap on a download from a link (in the text or behind an embed). Checked
+# against Content-Length up front and against the running total during the
+# transfer. Attachments on Discord's own CDN are bounded by Discord's
+# upload limit instead.
+LINK_MAX_BYTES = int(_num('DISCORD_LINK_MAX_MB', 512) * 1e6)
 # Backoff after a *failed* login: 10 failures within 15-minute windows get
 # the container's IP banned for 24h, so never retry hot. IndexClient also
 # enforces this itself, so concurrent ingests can't slip past the backoff

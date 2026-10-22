@@ -1,24 +1,30 @@
-"""discord_bot/download.py — streaming to disk and Discord CDN re-signing.
+"""discord_bot/download.py — streaming to disk, the address check and
+link cap, and Discord CDN re-signing.
 
 This code had no coverage before it was split out of bot.py. The
-extraction itself was a pure move, but two behaviours in here are subtle
+extraction itself was a pure move, but these behaviours are subtle
 enough to be worth pinning permanently:
 
   * a 403/404 is only retried when the host is a Discord CDN — retrying a
     genuine 403 from anywhere else would hammer a server that has already
     said no;
   * the *original* error is what surfaces when re-signing fails, so the log
-    shows why the download actually died rather than a secondary failure.
+    shows why the download actually died rather than a secondary failure;
+  * a link in a message is fetched only from a public address, every
+    redirect hop included, and only up to DISCORD_LINK_MAX_MB.
 
 Follows the fake-session pattern from test_index_client.py: the session is
-injected rather than built, so nothing here opens a socket.
+injected rather than built, and DNS is faked, so nothing here opens a
+socket.
 """
 import asyncio
 
 import aiohttp
 import pytest
 
-from discord_bot import download
+from bots_common import sniff
+from bots_common.download import TooLarge
+from discord_bot import config, download
 
 
 def run(coro):
@@ -36,14 +42,16 @@ class FakeContent:
 
 
 class FakeResponse:
-    def __init__(self, status=200, chunks=(), payload=None):
+    def __init__(self, status=200, chunks=(), payload=None, headers=None,
+                 length=None):
         self.status = status
+        self.headers = headers or {}
         self.content = FakeContent(chunks)
-        self.content_length = sum(len(c) for c in chunks) or None
+        self.content_length = length or sum(len(c) for c in chunks) or None
         self._payload = payload
 
     def raise_for_status(self):
-        if self.status != 200:
+        if self.status >= 400:
             err = aiohttp.ClientResponseError()
             err.status = self.status
             raise err
@@ -91,6 +99,20 @@ class Src:
 CDN = 'https://cdn.discordapp.com/attachments/1/2/clip.mp4'
 FRESH = 'https://cdn.discordapp.com/attachments/1/2/clip.mp4?ex=refreshed'
 ELSEWHERE = 'https://example.com/clip.mp4'
+INTERNAL = 'http://web:5001/media/clip.mp4'
+
+#: What the fake DNS answers. `web` is the index container's name on the
+#: stack's networks — the obvious thing a hostile link would point at.
+ADDRESSES = {'cdn.discordapp.com': ['162.159.130.233'],
+             'example.com': ['93.184.216.34'],
+             'web': ['172.18.0.5']}
+
+
+@pytest.fixture(autouse=True)
+def fake_dns(monkeypatch):
+    def getaddrinfo(host, port, **kw):
+        return [(0, 0, 0, '', (address, port)) for address in ADDRESSES[host]]
+    monkeypatch.setattr(sniff.socket, 'getaddrinfo', getaddrinfo)
 
 
 def _dl(session):
@@ -131,6 +153,73 @@ def test_stream_raises_on_http_error(tmp_path):
 
     with pytest.raises(aiohttp.ClientResponseError):
         run(_dl(session).stream(CDN, str(tmp_path / 'x'), 'clip.mp4'))
+
+
+# ── stream: public addresses only, links capped ───────────────────────────
+def test_a_link_to_an_internal_host_is_never_requested(tmp_path):
+    session = FakeSession(get=[FakeResponse(chunks=[b'secret'])])
+
+    with pytest.raises(sniff.Blocked):
+        run(_dl(session).stream(INTERNAL, str(tmp_path / 'x'), 'clip.mp4'))
+
+    assert session.gets == []
+
+
+def test_a_redirect_into_an_internal_host_is_refused(tmp_path):
+    """Hop one is public, hop two is not: the check must see every hop."""
+    session = FakeSession(get=[FakeResponse(302, headers={'Location': INTERNAL}),
+                               FakeResponse(chunks=[b'secret'])])
+
+    with pytest.raises(sniff.Blocked):
+        run(_dl(session).stream(ELSEWHERE, str(tmp_path / 'x'), 'clip.mp4'))
+
+    assert session.gets == [ELSEWHERE]
+    assert session.get_kwargs[0]['allow_redirects'] is False
+
+
+def test_a_redirect_between_public_hosts_is_followed(tmp_path):
+    dst = tmp_path / 'out.bin'
+    session = FakeSession(get=[FakeResponse(301, headers={'Location': CDN}),
+                               FakeResponse(chunks=[b'ok'])])
+
+    run(_dl(session).stream(ELSEWHERE, str(dst), 'clip.mp4'))
+
+    assert dst.read_bytes() == b'ok'
+    assert session.gets == [ELSEWHERE, CDN]
+
+
+def test_a_link_over_the_cap_is_refused_before_a_byte_is_written(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(config, 'LINK_MAX_BYTES', 1_000)
+    dst = tmp_path / 'out.bin'
+    session = FakeSession(get=[FakeResponse(chunks=[b'x'], length=9_000_000)])
+
+    with pytest.raises(TooLarge) as exc:
+        run(_dl(session).stream(ELSEWHERE, str(dst), 'clip.mp4'))
+
+    assert exc.value.size == 9_000_000
+    assert not dst.exists()
+
+
+def test_a_link_without_a_length_is_stopped_at_the_cap(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, 'LINK_MAX_BYTES', 1_000)
+    session = FakeSession(get=[FakeResponse(chunks=[b'x' * 400] * 10)])
+    session._get[0].content_length = None   # chunked: nothing to trust
+
+    with pytest.raises(TooLarge):
+        run(_dl(session).stream(ELSEWHERE, str(tmp_path / 'x'), 'clip.mp4'))
+
+
+def test_an_attachment_on_the_cdn_is_not_capped(tmp_path, monkeypatch):
+    """Discord's upload limit bounds attachments; the link cap must not
+    refuse a big one that Discord itself accepted."""
+    monkeypatch.setattr(config, 'LINK_MAX_BYTES', 1_000)
+    dst = tmp_path / 'out.bin'
+    session = FakeSession(get=[FakeResponse(chunks=[b'x' * 400] * 10)])
+
+    run(_dl(session).stream(CDN, str(dst), 'clip.mp4'))
+
+    assert dst.stat().st_size == 4_000
 
 
 # ── download: the re-signing retry ────────────────────────────────────────

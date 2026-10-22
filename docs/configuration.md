@@ -103,6 +103,7 @@ See [Discord bot](discord-bot.md) for what each feature does, and
 | `DISCORD_DM_INGEST` | no | `true` | Role holders may DM the bot, and what they send is indexed as private media of their linked account. Needs `DISCORD_INGEST_ROLE`. |
 | `DISCORD_LOOKUP_TTL` | no | `60` | Seconds the bot caches which index account a Discord user is linked to. |
 | `DISCORD_FORWARD_TAG_WAIT` | no | `15` | Seconds an untagged forward waits for a follow-up message with its tags. `0` doesn't wait. |
+| `DISCORD_LINK_MAX_MB` | no | `512` | Size limit for a file downloaded from a link or an embed, in MB. Attachments are limited by Discord's own upload limit instead. |
 | `DISCORD_LOG_CHANNEL_ID` | no | — | Channel for status lines (startup, each ingest result, failures). Unset turns it off. |
 | `DISCORD_NOTIFY_THUMBNAIL_ONLY` | no | `false` | `true` always attaches the thumbnail to an announcement, never the original file. |
 
