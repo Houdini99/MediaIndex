@@ -53,8 +53,7 @@
     </div>
     </div>
   </div>
-
-  <datalist id="tag-suggestions"></datalist>
 </div>
 {% endblock %}
-{% block extra_js %}<script src="{{ url_for('static', filename='js/queue.js') }}"></script>{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/tag-autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/queue.js') }}"></script>{% endblock %}

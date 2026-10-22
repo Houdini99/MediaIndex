@@ -10,11 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
         error:       'processing failed — re-upload or discard',
     };
 
-    fetch('/api/tags').then(r => r.json()).then(tags => {
-        const dl = document.getElementById('tag-suggestions');
-        tags.forEach(t => { const o = document.createElement('option'); o.value = t; dl.appendChild(o); });
-    }).catch(() => {});
-
     /* Deliberately not shared with the admin pages, which format sizes
      * server-side via app/admin/format.py. Two differences make this the
      * wrong function to merge with that one:
@@ -102,7 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tagInput = document.createElement('input');
                 tagInput.type = 'text';
                 tagInput.placeholder = 'Tags (separated by commas)…';
-                tagInput.setAttribute('list', 'tag-suggestions');
+                // Comma-aware autocomplete (js/tag-autocomplete.js): the native
+                // <datalist> matched the whole value, so it died after the first
+                // comma. Wrapped so the list opens under the input, not under
+                // the buttons below it.
+                tagInput.setAttribute('data-tag-ac', '');
+                const tagField = document.createElement('div');
+                tagField.appendChild(tagInput);
 
                 const privacyLabel = document.createElement('label');
                 privacyLabel.className = 'privacy-toggle';
@@ -142,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         .catch(() => { submitBtn.disabled = false; });
                 });
 
-                details.appendChild(tagInput);
+                details.appendChild(tagField);
                 details.appendChild(privacyLabel);
                 actions.appendChild(submitBtn);
             }
