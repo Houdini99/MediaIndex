@@ -1,4 +1,5 @@
-"""Gallery sort options, including seed-stable random pagination."""
+"""Gallery sort options, including seed-stable random pagination, and the
+query arguments the gallery page and /api/media share."""
 import pytest
 
 from app.config import Config
@@ -58,3 +59,23 @@ def test_seed_folding_keeps_pages_stable(client, logged_in, many_items):
     big = 2**31 + 99
     assert _ids(client, sort='random', sort_seed=big, page=1) == \
         _ids(client, sort='random', sort_seed=big, page=1)
+
+
+@pytest.mark.parametrize('qs', [
+    '', 'type=video', 'search=beach', 'exclude_tags=beach', 'hide_ai=1',
+    'hide_ai=1&exclude_tags=beach', 'private_only=1', 'sort=oldest',
+    'sort=random&sort_seed=42',
+])
+def test_the_gallery_page_and_its_api_read_the_same_filters(client, logged_in, monkeypatch, qs):
+    """index() and /api/media share _gallery_filters(): the first page the
+    server renders holds exactly the items the API returns for page 1."""
+    import re
+    monkeypatch.setattr(Config, 'AI_TAGS', ('ai',))
+    for i, (name, tags, private) in enumerate((
+            ('a.jpg', 'beach', False), ('b.mp4', 'beach,ai', False),
+            ('c.mp4', 'city', True), ('d.png', 'ai', False), ('e.gif', '', True))):
+        insert_media(name, f'{name}.png', tags, f'hash-{i}', logged_in, private)
+    html = client.get(f'/?{qs}').get_data(as_text=True)
+    page = [int(i) for i in re.findall(r'<div class="gallery-item" data-id="(\d+)"', html)]
+    api = [m['id'] for m in client.get(f'/api/media?{qs}').get_json()['media']]
+    assert page == api and page, qs

@@ -15,13 +15,9 @@ from ..config import Config
 from .crypto import ENC_SUFFIX, NONCE_BYTES, enc_name, iter_decrypted, strip_enc
 
 
-def allowed_file(filename):
-    ext = filename.rsplit('.', 1)[-1].lower()
-    return ext in (Config.ALLOWED_IMAGE_EXT | Config.ALLOWED_GIF_EXT | Config.ALLOWED_VIDEO_EXT)
-
-
-def file_type(filename):
-    ext = filename.rsplit('.', 1)[-1].lower()
+def ext_type(ext):
+    """'image', 'gif', 'video' or 'unknown' for a file extension."""
+    ext = ext.lower()
     if ext in Config.ALLOWED_IMAGE_EXT:
         return "image"
     if ext in Config.ALLOWED_GIF_EXT:
@@ -29,6 +25,18 @@ def file_type(filename):
     if ext in Config.ALLOWED_VIDEO_EXT:
         return "video"
     return "unknown"
+
+
+def allowed_ext(ext):
+    return ext_type(ext) != "unknown"
+
+
+def file_type(filename):
+    return ext_type(filename.rsplit('.', 1)[-1])
+
+
+def allowed_file(filename):
+    return allowed_ext(filename.rsplit('.', 1)[-1])
 
 
 #: Read size for hashing and copying media. 8 KiB made a multi-GB video

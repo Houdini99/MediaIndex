@@ -30,7 +30,7 @@ from .db import (
     update_media_tags,
     bulk_edit_tags,
 )
-from .processing import allowed_file, save_stream_hashed
+from .processing import allowed_ext, save_stream_hashed
 from .tagging import tag_list
 from .crypto import ENC_SUFFIX, iter_decrypted, plaintext_size, strip_enc
 from .ingest import ingest_file, set_media_privacy
@@ -44,13 +44,17 @@ from ..auth.db import (
 from ..auth.routes import login_required
 from ..config import Config
 from ..extensions import csrf, limiter
-from ..request_parsing import json_ids
+from ..request_parsing import form_flag, json_ids
 from .. import site_logins
 from ..security_log import failed_login
 
 
-def _ai_exclude(exclude_tags):
-    """Append the configured AI tags to an exclude_tags string."""
+def _exclude_tags_arg():
+    """`exclude_tags` from the query, plus the configured AI tags when
+    `hide_ai=1`."""
+    exclude_tags = request.args.get('exclude_tags', '')
+    if request.args.get('hide_ai', '') != '1':
+        return exclude_tags
     ai_tags = ','.join(Config.AI_TAGS)
     return (exclude_tags + ',' + ai_tags).strip(',') if exclude_tags else ai_tags
 
@@ -62,40 +66,41 @@ def _int_arg(name, default):
         return default
 
 
+def _gallery_filters():
+    """The gallery's query arguments, read the same way by the page and
+    /api/media. Returns (where, sort, sort_seed); `where` holds the
+    keyword arguments get_media() and get_media_count() share."""
+    where = {
+        'ft': request.args.get('type', 'all'),
+        'search': request.args.get('search', ''),
+        'exclude_tags': _exclude_tags_arg(),
+        'viewer_id': g.user['id'],
+        'private_only': request.args.get('private_only', '') == '1',
+    }
+    return where, request.args.get('sort', 'newest'), _int_arg('sort_seed', 0)
+
+
 # ── Pages ─────────────────────────────────────────────────────────────────
 @media_bp.route('/')
 @login_required
 def index():
-    hide_ai = request.args.get('hide_ai', '')
-    private_only = request.args.get('private_only', '') == '1'
-    sort = request.args.get('sort', 'newest')
+    where, sort, sort_seed = _gallery_filters()
     # Random sort needs a stable seed in the URL so the infinite-scroll API
     # pages continue the same ordering instead of reshuffling per request.
     if sort == 'random' and not request.args.get('sort_seed'):
         args = request.args.to_dict()
         args['sort_seed'] = str(random.randint(1, 2**31))
         return redirect(url_for('media.index', **args))
-    sort_seed = _int_arg('sort_seed', 0)
-    exclude_tags = request.args.get('exclude_tags', '')
-    if hide_ai == '1':
-        exclude_tags = _ai_exclude(exclude_tags)
-    media = get_media(
-        request.args.get('type', 'all'),
-        request.args.get('search', ''),
-        exclude_tags,
-        viewer_id=g.user['id'],
-        private_only=private_only,
-        sort=sort,
-        sort_seed=sort_seed,
-    )
+    media = get_media(**where, sort=sort, sort_seed=sort_seed)
     return render_template(
         'index.html',
         media=media,
-        search=request.args.get('search', ''),
+        search=where['search'],
+        # As typed: the form shows the AI tags through the hide_ai switch.
         exclude_tags=request.args.get('exclude_tags', ''),
-        filter_type=request.args.get('type', 'all'),
-        hide_ai=hide_ai,
-        private_only=private_only,
+        filter_type=where['ft'],
+        hide_ai=request.args.get('hide_ai', ''),
+        private_only=where['private_only'],
         sort=sort,
     )
 
@@ -122,7 +127,7 @@ def _store_upload(f, tags, uid, is_private):
     filesystem-safe — non-ASCII original names are fine.
     """
     ext = os.path.splitext(os.path.basename(f.filename or ''))[1].lstrip('.').lower()
-    if not ext or not allowed_file(f"f.{ext}"):
+    if not ext or not allowed_ext(ext):
         return 'error', None
     with tempfile.NamedTemporaryFile(dir=Config.UPLOAD_FOLDER, delete=False,
                                      suffix=f'.{ext}') as tf:
@@ -137,33 +142,31 @@ def _store_upload(f, tags, uid, is_private):
     return ingest_file(tmp, ext, tags, uid, is_private, filehash=fh)
 
 
+#: One flash per _store_upload() status that occurred: (status, prefix,
+#: flash category), in display order.
+_UPLOAD_FLASHES = (
+    ('ok', '✅ Successful', 'success'),
+    ('duplicate', '⚠️ Duplicates', 'warning'),
+    ('error', '❌ Error', 'danger'),
+)
+
+
 @media_bp.route('/upload', methods=['GET', 'POST'])
 @login_required
 def upload():
     if request.method == 'POST':
         files = request.files.getlist('files')
-        results = {'uploaded': [], 'duplicates': [], 'errors': []}
+        results = {status: [] for status, _, _ in _UPLOAD_FLASHES}
         uid = _owner_uid(g.user['id'], g.user['username'],
                          request.form.get('uploaded_for'))
         for i, f in enumerate(files):
-            fn = f.filename or '(unnamed)'
             tags = request.form.get(f'tags_{i}', '')
-            is_private = request.form.get(f'private_{i}') in ('1', 'on', 'true')
+            is_private = form_flag(request.form.get(f'private_{i}'))
             status, _ = _store_upload(f, tags, uid, is_private)
-            if status == 'ok':
-                results['uploaded'].append(fn)
-            elif status == 'duplicate':
-                results['duplicates'].append(fn)
-            else:
-                results['errors'].append(fn)
-        for k, v in results.items():
-            if v:
-                if k == 'uploaded':
-                    flash(f"✅Successful: {', '.join(v)}", "success")
-                elif k == 'duplicates':
-                    flash(f"⚠️ Duplicates: {', '.join(v)}", "warning")
-                else:
-                    flash(f"❌ Error: {', '.join(v)}", "danger")
+            results[status].append(f.filename or '(unnamed)')
+        for status, prefix, category in _UPLOAD_FLASHES:
+            if results[status]:
+                flash(f"{prefix}: {', '.join(results[status])}", category)
         return redirect(url_for('media.upload'))
     return render_template('upload.html')
 
@@ -201,6 +204,7 @@ def _authorize_file(fname):
     on disk mid-encrypt/decrypt before its row points at the '.enc' name. This
     is why the check must not fail open: those unindexed plaintext artifacts
     must never be served just because no row currently claims their name.
+    Returns the owner's user id.
     """
     row = get_privacy_for_file(fname)
     if not row:
@@ -208,21 +212,19 @@ def _authorize_file(fname):
     owner_uid, is_private = row[0], row[1]
     if is_private and owner_uid != g.user['id']:
         abort(404)
+    return owner_uid
 
 
-def _serve_encrypted(folder, fname):
+def _serve_encrypted(folder, fname, owner_uid):
     """Stream a `.enc` file decrypted on the fly, honoring HTTP Range requests.
 
-    Owner is taken from the media row (not from the requesting session) so the
-    correct key is used even if a future change ever allowed shared access.
+    `owner_uid` comes from the media row (_authorize_file), not from the
+    requesting session, so the correct key is used even if a future change
+    ever allowed shared access.
     """
     path = os.path.join(folder, fname)
     if not os.path.isfile(path):
         abort(404)
-    row = get_privacy_for_file(fname)
-    if not row:
-        abort(404)
-    owner_uid = row[0]
     key = get_user_enc_key(owner_uid)
     if not key:
         abort(404)
@@ -263,18 +265,18 @@ def _serve_encrypted(folder, fname):
 @media_bp.route('/thumbs/<fname>')
 @login_required
 def serve_thumb(fname):
-    _authorize_file(fname)
+    owner_uid = _authorize_file(fname)
     if fname.endswith(ENC_SUFFIX):
-        return _serve_encrypted(Config.THUMB_FOLDER, fname)
+        return _serve_encrypted(Config.THUMB_FOLDER, fname, owner_uid)
     return send_from_directory(Config.THUMB_FOLDER, fname)
 
 
 @media_bp.route('/media/<fname>')
 @login_required
 def serve_media(fname):
-    _authorize_file(fname)
+    owner_uid = _authorize_file(fname)
     if fname.endswith(ENC_SUFFIX):
-        return _serve_encrypted(Config.UPLOAD_FOLDER, fname)
+        return _serve_encrypted(Config.UPLOAD_FOLDER, fname, owner_uid)
     return send_from_directory(Config.UPLOAD_FOLDER, fname)
 
 
@@ -427,18 +429,10 @@ def media_meta(media_id):
 @media_bp.route('/api/media')
 @login_required
 def api_media():
-    ft = request.args.get('type', 'all')
-    search = request.args.get('search', '')
-    hide_ai = request.args.get('hide_ai', '')
-    private_only = request.args.get('private_only', '') == '1'
-    sort = request.args.get('sort', 'newest')
-    sort_seed = _int_arg('sort_seed', 0)
-    exclude_tags = request.args.get('exclude_tags', '')
-    if hide_ai == '1':
-        exclude_tags = _ai_exclude(exclude_tags)
+    where, sort, sort_seed = _gallery_filters()
     page = max(1, min(_int_arg('page', 1), 9999))
-    media = get_media(ft, search, exclude_tags, page, viewer_id=g.user['id'], private_only=private_only, sort=sort, sort_seed=sort_seed)
-    total = get_media_count(ft, search, exclude_tags, viewer_id=g.user['id'], private_only=private_only)
+    media = get_media(**where, page=page, sort=sort, sort_seed=sort_seed)
+    total = get_media_count(**where)
     has_more = (page * Config.PAGE_SIZE) < total
     result = [
         {
@@ -484,18 +478,9 @@ def api_feed():
     ft = request.args.get('types') or 'all'     # comma-separated
     search = request.args.get('search', '')
     include_tags = request.args.get('include_tags', '')
-    hide_ai = request.args.get('hide_ai', '')
-    exclude_tags = request.args.get('exclude_tags', '')
-    if hide_ai == '1':
-        exclude_tags = _ai_exclude(exclude_tags)
-    try:
-        seed = int(request.args.get('seed', '0'))
-    except (ValueError, TypeError):
-        seed = 0
-    try:
-        page = max(1, min(int(request.args.get('page', 1)), 99999))
-    except (ValueError, TypeError):
-        page = 1
+    exclude_tags = _exclude_tags_arg()
+    seed = _int_arg('seed', 0)
+    page = max(1, min(_int_arg('page', 1), 99999))
 
     ids = _shuffled_feed_ids(seed, ft, search, exclude_tags, include_tags, g.user['id'])
 
@@ -617,8 +602,7 @@ def api_upload():
     private = request.form.get('private', '')
     results = []
     for i, f in enumerate(files):
-        is_private = request.form.get(f'private_{i}', private) \
-            in ('1', 'on', 'true')
+        is_private = form_flag(request.form.get(f'private_{i}', private))
         if is_private and unknown_owner:
             results.append({
                 'filename': f.filename or '', 'status': 'error',

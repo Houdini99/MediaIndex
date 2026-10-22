@@ -34,6 +34,7 @@ from ..auth.db import (
 from ..auth.routes import login_required
 from ..config import Config
 from ..extensions import limiter
+from ..request_parsing import form_flag
 from ..security_log import log_event
 
 
@@ -163,7 +164,7 @@ def staging_promote(sid):
             staging_db.release_claim(sid)
             return jsonify({'error': 'file is still being uploaded'}), 409
         tags = request.form.get('tags', '')
-        is_private = request.form.get('private') in ('1', 'on', 'true')
+        is_private = form_flag(request.form.get('private'))
         ext = os.path.splitext(row['fname'])[1].lstrip('.').lower()
         # Deliver the file into UPLOAD_FOLDER first (shutil.move survives
         # the staging→media_files Docker bind-mount boundary), then hand it

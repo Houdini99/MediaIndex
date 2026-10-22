@@ -21,6 +21,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   are gone. Every script that uses the database now stops with the
   `docker exec` command to run it in the web container when
   `DATABASE_URL` is not set, as the password scripts already did.
+- A privacy flag now reads `yes` and any capitalisation (`TRUE`, `On`)
+  as on, like the duplicate finder's switches already did: the upload
+  form's checkboxes, the upload API's `private` and `private_<n>` fields
+  and the queue's promote form. Before, only `1`, `on` and `true` counted.
 - Both bot images build from one Dockerfile, `bots_common/Dockerfile`,
   with a `BOT` build argument (`discord` or `telegram`); `./build.sh`
   passes it. A stack that builds the bot images itself needs
@@ -67,7 +71,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   checking the bots' API accounts and checking an app password (WebDAV
   and the upload API), and one place for the minimum password length
   (the forms, their inputs and `set_password.py`); logging out leaves
-  deleting the session cookie to Flask; the database modules lost their
+  deleting the session cookie to Flask; the gallery page and its API
+  read their filters in one place, and a private file is served after
+  one database lookup instead of two; the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.

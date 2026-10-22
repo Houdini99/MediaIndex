@@ -24,7 +24,7 @@ from .db import (
     thumb_path,
 )
 from .processing import (
-    file_type,
+    ext_type,
     gen_image_thumb,
     gen_placeholder_thumb,
     sha256_file,
@@ -107,7 +107,7 @@ def ingest_file(tmp_path, ext, tags, uid, is_private, premade_thumb=None,
     # The type (image/gif/video) is added as a tag unless the uploader
     # already typed it; tag search ignores case, so this check does too.
     tag_parts = tag_list(tags)
-    ftype = file_type(f"f.{ext}")
+    ftype = ext_type(ext)
     if ftype and ftype not in (t.lower() for t in tag_parts):
         tag_parts.append(ftype)
     full_tags = tag_str(tag_parts)

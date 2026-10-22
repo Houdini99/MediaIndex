@@ -87,3 +87,27 @@ def test_media_requires_login(client, private_upload):
     client.post('/logout')
     resp = client.get(f'/media/{fname}')
     assert resp.status_code == 302  # redirected to login
+
+
+def test_a_private_file_costs_one_privacy_lookup(client, private_upload, monkeypatch):
+    """_authorize_file hands the owner it looked up to _serve_encrypted,
+    which used to look the row up a second time."""
+    import app.media.routes as routes
+    calls = []
+    real = routes.get_privacy_for_file
+    monkeypatch.setattr(routes, 'get_privacy_for_file',
+                        lambda fname: calls.append(fname) or real(fname))
+    fname, data = private_upload
+    resp = client.get(f'/media/{fname}')
+    assert resp.status_code == 200 and resp.data == data
+    assert calls == [fname]
+
+
+@pytest.mark.parametrize('value', ['yes', 'TRUE', 'On'])
+def test_the_privacy_checkbox_accepts_any_on_value(client, logged_in, value):
+    buf = io.BytesIO()
+    Image.new('RGB', (8, 8), 'teal').save(buf, format='PNG')
+    client.post('/upload', data={'files': (io.BytesIO(buf.getvalue()), 'p.png'),
+                                 'private_0': value},
+                content_type='multipart/form-data')
+    assert get_all_media_paths()[0][1].endswith('.enc')

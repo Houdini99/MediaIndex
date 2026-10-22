@@ -50,6 +50,7 @@ from ..media.phash import (
     similarity_pct,
 )
 from ..media.tagging import tag_list, tag_str
+from ..request_parsing import form_flag
 
 # Tags applied to a quarantined item so it is also findable in the gallery.
 DUPE_TAG = 'dupe'
@@ -116,9 +117,8 @@ def normalize_params(raw):
         'types': types or list(TYPES),
         'video_frames': frames if frames in VIDEO_FRAME_CHOICES else DEFAULT_VIDEO_FRAMES,
         'min_group': max(2, min(50, min_group)),
-        'rehash': str(raw.get('rehash', '')).lower() in ('1', 'true', 'on', 'yes'),
-        'cross_uploader_only': str(raw.get('cross_uploader_only', '')).lower()
-                               in ('1', 'true', 'on', 'yes'),
+        'rehash': form_flag(raw.get('rehash')),
+        'cross_uploader_only': form_flag(raw.get('cross_uploader_only')),
         'sort': _one_of(raw.get('sort'),
                         ('similarity', 'wasted', 'size', 'newest'), 'similarity'),
     }
