@@ -6,6 +6,46 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `DISCORD_LINK_MAX_MB` (default 512): the size limit for a file the
+  Discord bot downloads from a link or an embed, like the Telegram bot's
+  `TELEGRAM_LINK_MAX_MB`. Attachments stay limited by Discord's own upload
+  limit.
+
+### Changed
+
+- Messages on the sign-in pages (a wrong password, "please log in", the
+  welcome on the choose-a-password page) look like the rest of the app's,
+  with an icon.
+- The first page of the gallery badges each item with its stored type,
+  like the cards that load while scrolling. An old item whose type is
+  unknown is now badged *unknown* instead of *image*.
+- `/delete-bulk`, `/privacy-bulk` and `/edit-bulk` answer a body without a
+  usable `ids` list with one message, "ids must be a non-empty list of
+  integers", instead of two.
+- The gallery, feed and lightbox APIs read each item's stored type instead
+  of working it out from the file name for every row, and the duplicate
+  finder counts items per type in one query.
+- Code clean-up from an audit, with no change in behaviour: dead code
+  removed; the bots share one download path, and the app one helper each
+  for decrypting a private file, parsing id lists and checking the bots'
+  API accounts; the database modules lost their wrapper and set-up
+  functions; the pages share one header, one set of card and button
+  styles, and the sign-in pages one layout.
+
+### Fixed
+
+- `scripts/set_password_hash.py` accepted `plain` hashes, which the
+  pinned Werkzeug can no longer check: every login of that user then
+  failed with a server error. It accepts only `scrypt` and `pbkdf2` now.
+- Tag suggestions on the Untagged page stopped after the first comma. The
+  page now uses the same tag autocomplete as every other page.
+- The tag count on the Tags page read "12 von 40 Tags" while filtering;
+  it reads "12 of 40 Tags".
+- On phones, the Tags and Upload pages padded the top bar differently from
+  every other page.
+
 ### Security
 
 - The Discord bot now checks every link it downloads, attachments and
@@ -13,8 +53,6 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   other link paths, one redirect hop at a time. Before, a link ending in a
   media extension was fetched without it, so a member with the ingest
   role could make the bot fetch a service inside the stack.
-- Files from links and embeds in Discord are capped at
-  `DISCORD_LINK_MAX_MB` (512 MB).
 
 ## [1.0.0] — 2026-10-21
 
