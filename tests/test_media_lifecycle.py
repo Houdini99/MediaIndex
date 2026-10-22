@@ -8,7 +8,7 @@ import pytest
 from PIL import Image
 
 from app.config import Config
-from app.media import db as media_db
+from app.db_utils import db_conn
 from app.media.db import (
     insert_media, delete_media, get_all_media_paths,
 )
@@ -108,7 +108,7 @@ def test_delete_legacy_relative_path_row(app, user):
     assert insert_media('meme_files/legacy.jpg', '/app/thumbnails/legacy.png',
                         'old', 'hash-legacy', uid)
     # insert_media normalizes to basenames, so simulate a true legacy row
-    with media_db._conn() as conn:
+    with db_conn() as conn:
         conn.execute("UPDATE media.media SET filepath='meme_files/legacy.jpg', "
                      "thumb='/app/thumbnails/legacy.png'")
         conn.commit()

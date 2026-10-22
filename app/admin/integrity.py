@@ -1,6 +1,6 @@
 """Filesystem/DB integrity checks for the admin panel.
 
-Media rows store bare basenames (normalized at startup by init_media_db),
+Media rows store bare basenames (insert_media writes them that way),
 and all comparisons here are done on basenames against the configured
 folders — so the checks work no matter where the project root is mounted.
 """

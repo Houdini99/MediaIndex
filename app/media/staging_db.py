@@ -16,17 +16,10 @@ Status lifecycle:
 import os
 from datetime import datetime
 
+from psycopg.rows import dict_row
+
 from ..config import Config
-from ..db_utils import db_conn, db_now, ensure_pg_schema
-
-
-def _conn():
-    return db_conn()
-
-
-# ── Schema ─────────────────────────────────────────────────────────────────
-def init_staging_db():
-    ensure_pg_schema()
+from ..db_utils import db_conn, db_now
 
 
 def staging_file_path(user_id, fname):
@@ -44,7 +37,7 @@ def insert_staging_row(user_id, fname, size, mtime):
     """Insert a new staging row; returns its id, or None when the
     (user_id, fname) row already exists (ON CONFLICT DO NOTHING never
     aborts the transaction)."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO media.staging (user_id, fname, size, mtime, discovered_at) "
@@ -59,7 +52,7 @@ def update_staging_size(sid, size, mtime):
     """Record a new size/mtime observation (file still changing, or a
     processed file that was overwritten via DAV → back to pending).
     Never touches rows a promote request has claimed."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "UPDATE media.staging SET size=%s, mtime=%s, status='pending', "
@@ -69,7 +62,7 @@ def update_staging_size(sid, size, mtime):
 
 
 def update_staging_processed(sid, filehash, thumb, ftype, status):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "UPDATE media.staging SET filehash=%s, thumb=%s, ftype=%s, status=%s, "
@@ -79,7 +72,7 @@ def update_staging_processed(sid, filehash, thumb, ftype, status):
 
 
 def set_staging_error(sid, message):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "UPDATE media.staging SET status='error', error=%s WHERE id=%s",
@@ -90,7 +83,7 @@ def set_staging_error(sid, message):
 def all_rows_for_reconcile():
     """Every staging row as
     (id, user_id, fname, size, mtime, status, thumb, claimed_at)."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT id, user_id, fname, size, mtime, status, thumb, claimed_at "
@@ -102,40 +95,36 @@ def all_rows_for_reconcile():
 _ROW_COLS = "id, fname, size, mtime, filehash, thumb, ftype, status, discovered_at"
 
 
-def _row_dict(row):
-    d = dict(zip(
-        ('id', 'fname', 'size', 'mtime', 'filehash', 'thumb', 'ftype', 'status', 'discovered_at'),
-        row,
-    ))
-    # timestamptz comes back as datetime; the queue JSON historically
-    # carries an ISO string.
-    if isinstance(d['discovered_at'], datetime):
-        d['discovered_at'] = d['discovered_at'].isoformat()
-    return d
+def _iso_discovered(row):
+    """timestamptz comes back as datetime; the queue JSON historically
+    carries an ISO string."""
+    if isinstance(row['discovered_at'], datetime):
+        row['discovered_at'] = row['discovered_at'].isoformat()
+    return row
 
 
 def list_staging(user_id):
-    with _conn() as conn:
-        cur = conn.cursor()
+    with db_conn() as conn:
+        cur = conn.cursor(row_factory=dict_row)
         cur.execute(
             f"SELECT {_ROW_COLS} FROM media.staging WHERE user_id=%s ORDER BY id DESC",
             (user_id,))
-        return [_row_dict(r) for r in cur.fetchall()]
+        return [_iso_discovered(r) for r in cur.fetchall()]
 
 
 def get_staging_row(sid, user_id):
-    with _conn() as conn:
-        cur = conn.cursor()
+    with db_conn() as conn:
+        cur = conn.cursor(row_factory=dict_row)
         cur.execute(
             f"SELECT {_ROW_COLS} FROM media.staging WHERE id=%s AND user_id=%s",
             (sid, user_id))
         row = cur.fetchone()
-        return _row_dict(row) if row else None
+        return _iso_discovered(row) if row else None
 
 
 def count_pending(user_id):
     """Items awaiting user action — everything not currently being promoted."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT COUNT(*) FROM media.staging WHERE user_id=%s AND status != 'promoting'",
@@ -147,7 +136,7 @@ def count_pending(user_id):
 def claim_for_promote(sid, user_id):
     """Atomically claim a row for promotion. Only one request can win, and
     the scanner's reconciliation leaves claimed rows alone."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "UPDATE media.staging SET status='promoting', claimed_at=%s "
@@ -158,7 +147,7 @@ def claim_for_promote(sid, user_id):
 
 
 def release_claim(sid, status='ready'):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "UPDATE media.staging SET status=%s, claimed_at=NULL "
@@ -171,7 +160,7 @@ def delete_staging_for_user(user_id):
     """Delete every staging row belonging to `user_id`; returns the thumb
     values of the deleted rows so the caller can remove the staged
     thumbnails from disk. Used by admin delete-user."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "DELETE FROM media.staging WHERE user_id=%s RETURNING thumb",
@@ -182,7 +171,7 @@ def delete_staging_for_user(user_id):
 
 
 def delete_staging_row(sid):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM media.staging WHERE id=%s", (sid,))
         conn.commit()

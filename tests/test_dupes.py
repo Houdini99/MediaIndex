@@ -309,6 +309,9 @@ def test_stale_job_is_reaped(app, admin):
     dupes_db.claim_job('{}', 10, uid)
     assert dupes_db.reap_stale_jobs(timedelta(seconds=-1)) == 1
     assert dupes_db.fetch_running_job() is None
+    last = dupes_db.fetch_last_job()
+    assert (last['state'], last['error']) == ('error', 'scan worker stopped responding')
+    assert last['finished_at'] is not None
 
 
 # ── Video decoding ─────────────────────────────────────────────────────────

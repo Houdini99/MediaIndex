@@ -14,11 +14,7 @@ from datetime import datetime, timezone
 from psycopg.errors import UniqueViolation
 
 from ..config import Config
-from ..db_utils import db_conn, db_now, ensure_pg_schema
-
-
-def _conn():
-    return db_conn()
+from ..db_utils import db_conn, db_now
 
 
 #: Advisory-lock key serializing user creation, so the "first account is an
@@ -27,14 +23,10 @@ def _conn():
 _BOOTSTRAP_LOCK_KEY = 0x6D656469_62
 
 
-def init_auth_db():
-    ensure_pg_schema()
-
-
 # ── User lookup ────────────────────────────────────────────────────────────
 def fetch_user_by_id(user_id):
     """(id, username, is_admin, session_gen, must_change_password), or None."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT id, username, is_admin, session_gen, "
                     "must_change_password FROM users.users WHERE id=%s",
@@ -44,7 +36,7 @@ def fetch_user_by_id(user_id):
 
 def fetch_user_for_login(username):
     """(id, password_hash, session_gen), or None."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT id, password_hash, session_gen FROM users.users "
                     "WHERE username = %s", (username,))
@@ -61,7 +53,7 @@ def insert_user(username, password_hash, enc_key=None, must_change_password=Fals
     NOTHING (rather than catching the unique violation) so the connection
     is never left in an aborted transaction.
     """
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         # Serialize user creation. Reading COUNT(*) and passing the result
         # back into the INSERT was a read-then-write race — two
@@ -94,7 +86,7 @@ def insert_user(username, password_hash, enc_key=None, must_change_password=Fals
 # ── Per-user media encryption key ─────────────────────────────────────────
 def get_user_enc_key(user_id):
     """Return the user's raw encryption key bytes, or None if unset."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT enc_key FROM users.users WHERE id=%s", (user_id,))
         row = cur.fetchone()
@@ -116,7 +108,7 @@ def get_or_create_user_enc_key(user_id):
     # unless we actually need it.
     from ..media.crypto import new_key
     key = new_key()
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("UPDATE users.users SET enc_key=%s WHERE id=%s",
                     (key, user_id))
@@ -135,7 +127,7 @@ def hash_dav_password(password):
 
 def set_dav_password_hash(user_id, password_hash):
     """Set (or revoke, with None) the user's WebDAV app-password digest."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         created = db_now() if password_hash else None
         cur.execute(
@@ -148,7 +140,7 @@ def set_dav_password_hash(user_id, password_hash):
 
 def fetch_user_for_dav(username):
     """Return (id, dav_password_hash) for a username, or None."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT id, dav_password_hash FROM users.users WHERE username=%s",
                     (username,))
@@ -156,7 +148,7 @@ def fetch_user_for_dav(username):
 
 
 def get_dav_password_created(user_id):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT dav_password_created FROM users.users WHERE id=%s",
                     (user_id,))
@@ -185,7 +177,7 @@ def resolve_telegram_user(telegram_id, telegram_username=None):
     """
     if telegram_id is None:
         return None
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT username FROM users.users WHERE telegram_user_id = %s",
@@ -216,7 +208,7 @@ def resolve_telegram_user(telegram_id, telegram_username=None):
 
 def get_telegram_identity(user_id):
     """(telegram_user_id, telegram_username) for a user, or (None, None)."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT telegram_user_id, telegram_username FROM users.users "
@@ -239,7 +231,7 @@ def set_telegram_identity(user_id, telegram_id, telegram_username):
     """
     name = (telegram_username or '').strip().lstrip('@') or None
     tg_id = int(telegram_id) if telegram_id else None
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         try:
             cur.execute(
@@ -276,7 +268,7 @@ def _link_code_hash(code):
 
 def resolve_discord_user(discord_id):
     """Index username that linked this Discord account, or None."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT username FROM users.users WHERE discord_user_id = %s",
@@ -287,7 +279,7 @@ def resolve_discord_user(discord_id):
 
 def get_discord_identity(user_id):
     """The Discord user id a user linked, or None."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT discord_user_id FROM users.users WHERE id=%s",
                     (user_id,))
@@ -297,7 +289,7 @@ def get_discord_identity(user_id):
 
 def discord_link_pending(user_id):
     """True while a link code this user was issued is unredeemed and live."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT coalesce(discord_link_expires > now(), false) "
@@ -311,7 +303,7 @@ def set_discord_identity(user_id, discord_id):
     and drop any pending code. Unlinking and tests only — a link the user
     asks for goes through new_discord_link_code / claim_discord_link_code.
     Returns 'ok', or 'taken' when another index user holds that id."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         try:
             cur.execute(
@@ -333,7 +325,7 @@ def new_discord_link_code(user_id):
     earlier one; returns it formatted for display (`K7QX-M2PA`). Only the
     hash is stored."""
     code = ''.join(secrets.choice(_LINK_ALPHABET) for _ in range(8))
-    with _conn() as conn:
+    with db_conn() as conn:
         conn.cursor().execute(
             "UPDATE users.users SET discord_link_code_hash=%s, "
             "discord_link_expires=now() + make_interval(secs => %s) "
@@ -356,7 +348,7 @@ def claim_discord_link_code(code, discord_id):
     code_hash = _link_code_hash(code)
     if code_hash is None:
         return None
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             """
@@ -404,7 +396,7 @@ def is_ip_banned(ip):
     """
     global _ban_check_err_last
     try:
-        with _conn() as conn:
+        with db_conn() as conn:
             cur = conn.cursor()
             cur.execute(
                 "SELECT banned, manual, last_attempt FROM users.failed_logins "
@@ -445,7 +437,7 @@ def record_failed_login(ip):
     (for the security log). A banned address is refused before it can fail
     again, so the count reaches the threshold exactly once per ban.
     """
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             """
@@ -475,7 +467,7 @@ def record_failed_login(ip):
 
 
 def reset_failed_logins(ip):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM users.failed_logins WHERE ip=%s", (ip,))
         conn.commit()
@@ -483,14 +475,14 @@ def reset_failed_logins(ip):
 
 # ── Admin: user management ─────────────────────────────────────────────────
 def fetch_all_users():
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT id, username, is_admin FROM users.users ORDER BY id")
         return cur.fetchall()
 
 
 def delete_user(user_id):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM users.users WHERE id=%s", (user_id,))
         deleted = cur.rowcount > 0
@@ -499,7 +491,7 @@ def delete_user(user_id):
 
 
 def set_user_admin(user_id, is_admin):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("UPDATE users.users SET is_admin=%s WHERE id=%s",
                     (bool(is_admin), user_id))
@@ -509,7 +501,7 @@ def set_user_admin(user_id, is_admin):
 
 
 def count_users():
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM users.users")
         return cur.fetchone()[0]
@@ -527,7 +519,7 @@ def update_user_password(user_id, password_hash, must_change_password=False):
     at their next login (an admin resetting someone else's). False leaves
     the flag as it was, so a reset never lets a user skip that step.
     """
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("UPDATE users.users SET password_hash=%s, "
                     "must_change_password = must_change_password OR %s, "
@@ -545,7 +537,7 @@ def change_own_password(user_id, password_hash):
     Returns the new session_gen, for the caller to stamp into the session
     that made the change, or None if the user no longer exists.
     """
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("UPDATE users.users SET password_hash=%s, "
                     "must_change_password=false, "
@@ -559,7 +551,7 @@ def change_own_password(user_id, password_hash):
 
 # ── Admin: IP-ban management ───────────────────────────────────────────────
 def fetch_banned_ips():
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT ip, count, last_attempt, manual FROM users.failed_logins "
@@ -569,7 +561,7 @@ def fetch_banned_ips():
 
 def unban_ip(ip):
     """Lift a ban by deleting the row, which also resets the failure count."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM users.failed_logins WHERE ip=%s AND banned",
                     (ip,))
@@ -580,7 +572,7 @@ def unban_ip(ip):
 
 def fetch_watchlist_ips():
     """IPs with failed attempts that are not (yet) banned, worst first."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             "SELECT ip, count, last_attempt FROM users.failed_logins "
@@ -591,7 +583,7 @@ def fetch_watchlist_ips():
 def ban_ip(ip):
     """Manually ban an IP (permanent until lifted), keeping any existing
     failure count."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             """

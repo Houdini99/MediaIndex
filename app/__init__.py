@@ -20,11 +20,9 @@ def create_app():
                    Config.STAGING_DIR, Config.STAGING_THUMB_DIR):
         os.makedirs(folder, exist_ok=True)
 
-    # ── Initialise databases ──────────────────────────────────────────────
-    from .auth.db import init_auth_db
-    from .media.db import init_media_db
-    init_auth_db()
-    init_media_db()
+    # ── Database schema (idempotent; also backfills ftype) ───────────────
+    from .db_utils import ensure_pg_schema
+    ensure_pg_schema()
 
     # ── Middleware stack (order matters) ───────────────────────────────────
     # DispatcherMiddleware routes /dav to the WsgiDAV app before Flask sees

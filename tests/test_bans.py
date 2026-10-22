@@ -3,29 +3,30 @@ from datetime import datetime, timedelta
 
 from app.config import Config
 from app.auth.db import (
-    _conn, record_failed_login, is_ip_banned, reset_failed_logins,
+    record_failed_login, is_ip_banned, reset_failed_logins,
     ban_ip, unban_ip, fetch_banned_ips,
 )
+from app.db_utils import db_conn
 IP = '203.0.113.7'
 
 
 def _set_last_attempt(ip, dt):
     # Naive local datetime from the tests; timestamptz wants it aware.
-    with _conn() as conn:
+    with db_conn() as conn:
         conn.execute("UPDATE users.failed_logins SET last_attempt=%s WHERE ip=%s",
                      (dt.astimezone(), ip))
         conn.commit()
 
 
 def _row_count(ip):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM users.failed_logins WHERE ip=%s", (ip,))
         return cur.fetchone()[0]
 
 
 def _fail_count(ip):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT count FROM users.failed_logins WHERE ip=%s", (ip,))
         return cur.fetchone()[0]

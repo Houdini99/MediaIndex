@@ -20,8 +20,8 @@ import re
 import pytest
 from PIL import Image
 
+from app.db_utils import db_conn
 from app.media.db import (
-    _conn,
     get_media_by_id,
     get_media_count,
     insert_media,
@@ -42,7 +42,7 @@ def _png():
 
 
 def _find(filehash):
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT id FROM media.media WHERE filehash=%s", (filehash,))
         return cur.fetchone()[0]
@@ -112,7 +112,7 @@ def test_published_event_matches_what_is_stored(user):
 
 def _write_raw(mid, tags):
     """Store a tag string bypassing normalization, as pre-fix rows were."""
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("UPDATE media.media SET tags=%s WHERE id=%s", (tags, mid))
         conn.commit()

@@ -11,9 +11,10 @@ import base64
 from werkzeug.security import generate_password_hash
 
 from app.auth.db import (
-    _conn, fetch_user_by_id, fetch_user_for_login, hash_dav_password,
+    fetch_user_by_id, fetch_user_for_login, hash_dav_password,
     insert_user, set_dav_password_hash, set_user_admin,
 )
+from app.db_utils import db_conn
 
 NEW = 'my-own-password'
 
@@ -42,7 +43,7 @@ def _must_change(uid):
 
 
 def _fail_count():
-    with _conn() as conn:
+    with db_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT count FROM users.failed_logins WHERE ip='127.0.0.1'")
         row = cur.fetchone()

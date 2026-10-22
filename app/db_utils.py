@@ -339,9 +339,8 @@ def ftype_backfill_sql():
 def ensure_pg_schema():
     """Create schemas/tables/indexes idempotently.
 
-    Called by every init_*_db() entry point, so the app (and the pytest
-    fixtures) stay self-initializing regardless of which init function
-    runs first.
+    Called once per process by create_app (and by the pytest fixtures);
+    later calls return straight away.
     """
     global _pg_schema_ready
     if _pg_schema_ready:

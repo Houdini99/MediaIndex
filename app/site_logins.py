@@ -37,7 +37,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from .config import Config
-from .db_utils import db_conn, db_now, ensure_pg_schema
+from .db_utils import db_conn, db_now
 
 #: Larger than any real export of one site, small enough that a pasted
 #: browser profile can't be filed by accident.
@@ -257,7 +257,6 @@ def _row_to_login(row):
 
 
 def get_login(platform_id):
-    ensure_pg_schema()
     with db_conn() as conn:
         row = conn.execute(_SELECT + " WHERE s.platform = %s",
                            (platform_id,)).fetchone()
@@ -266,7 +265,6 @@ def get_login(platform_id):
 
 def all_logins():
     """{platform id: Login} for every stored login."""
-    ensure_pg_schema()
     with db_conn() as conn:
         rows = conn.execute(_SELECT).fetchall()
     return {row[0]: _row_to_login(row) for row in rows if platform(row[0])}
@@ -286,7 +284,6 @@ def login_for_url(url):
 def save_upload(platform_id, text, user_id):
     """Store an admin's upload, replacing whatever was there. Returns the
     new revision."""
-    ensure_pg_schema()
     with db_conn() as conn:
         row = conn.execute(
             """
@@ -310,7 +307,6 @@ def save_rotation(platform_id, revision, text):
     """Replace a login with what a bot's download rotated it to — only if
     it is still exactly the revision that download started from. Returns
     the new revision, or None when the login changed or went away."""
-    ensure_pg_schema()
     with db_conn() as conn:
         row = conn.execute(
             """
@@ -327,7 +323,6 @@ def save_rotation(platform_id, revision, text):
 
 
 def delete_login(platform_id):
-    ensure_pg_schema()
     with db_conn() as conn:
         cur = conn.execute("DELETE FROM users.site_logins WHERE platform = %s",
                            (platform_id,))
