@@ -531,62 +531,45 @@ def _download(url, opts, ctl, pattern, max_bytes, stall_timeout):
     """One yt-dlp run of `opts`, plus its one impersonated retry on a 403.
     Returns yt-dlp's info dict; cleans up and raises ResolveError (or
     DownloadStalled) on failure."""
-    def _run(run_opts):
+    logging.info("resolver: downloading %s (cap %.0f MB)",
+                 url, max_bytes / 1e6)
+    run_opts, retried = opts, False
+    while True:
         try:
             with yt_dlp.YoutubeDL(run_opts) as ydl:
                 return ydl.extract_info(url, download=True) or {}
         except Exception as e:
+            _cleanup(pattern)
             # yt-dlp may wrap the hook's DownloadStalled in its own error;
             # the ctl flag makes the stall unambiguous regardless.
             if ctl['stalled']:
+                logging.warning("resolver: %s — download stalled (no progress "
+                                "for %gs)%s, aborted", url, stall_timeout,
+                                " after retry" if retried else "")
                 raise DownloadStalled(
                     f"no progress for {stall_timeout:g}s") from e
-            raise
-
-    logging.info("resolver: downloading %s (cap %.0f MB)",
-                 url, max_bytes / 1e6)
-    try:
-        info = _run(opts)
-    except DownloadStalled:
-        logging.warning("resolver: %s — download stalled (no progress for "
-                        "%gs), aborted", url, stall_timeout)
-        _cleanup(pattern)
-        raise
-    except Exception as e:
-        if not _is_403(e):
-            _cleanup(pattern)
-            raise _download_failure(url, e) from e
-        if not impersonation_available():
-            logging.warning(
-                "resolver: %s returned HTTP 403 and curl_cffi is not "
-                "installed — rebuild the bot image to enable browser "
-                "impersonation", url)
-            _cleanup(pattern)
-            raise ResolveError(
-                "blocked by the site (HTTP 403) and browser impersonation "
-                "is unavailable — rebuild the bot image with curl_cffi",
-                emoji='❌') from e
+            if retried:
+                logging.warning("resolver: impersonated retry failed for %s",
+                                url, exc_info=True)
+                raise ResolveError(
+                    f"still blocked (HTTP 403) after a browser-impersonation "
+                    f"retry: {_clean_error(e)}", emoji='❌') from e
+            if not _is_403(e):
+                raise _download_failure(url, e) from e
+            if not impersonation_available():
+                logging.warning(
+                    "resolver: %s returned HTTP 403 and curl_cffi is not "
+                    "installed — rebuild the bot image to enable browser "
+                    "impersonation", url)
+                raise ResolveError(
+                    "blocked by the site (HTTP 403) and browser impersonation "
+                    "is unavailable — rebuild the bot image with curl_cffi",
+                    emoji='❌') from e
         logging.info("resolver: %s — HTTP 403, retrying with browser "
                      "impersonation", url)
-        _cleanup(pattern)
         ctl['stalled'] = False
-        try:
-            info = _run({**opts, 'impersonate': _impersonate_target(),
-                         'progress_hooks': [_progress_hook(url, ctl)]})
-        except DownloadStalled:
-            logging.warning("resolver: %s — download stalled (no progress "
-                            "for %gs) after retry, aborted", url,
-                            stall_timeout)
-            _cleanup(pattern)
-            raise
-        except Exception as e2:
-            logging.warning("resolver: impersonated retry failed for %s",
-                            url, exc_info=True)
-            _cleanup(pattern)
-            raise ResolveError(
-                f"still blocked (HTTP 403) after a browser-impersonation "
-                f"retry: {_clean_error(e2)}", emoji='❌') from e2
-    return info
+        run_opts, retried = {**opts, 'impersonate': _impersonate_target(),
+                             'progress_hooks': [_progress_hook(url, ctl)]}, True
 
 
 def _finish(url, info, pattern, max_bytes, used_cookies):

@@ -82,7 +82,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   takes its folder from `LOG_FOLDER`; the bots share their tag and
   file-extension helpers, and the upload event carries the item's stored
   type, which the Discord announcement now reads instead of guessing it
-  from the file name; the database modules lost their
+  from the file name; the link resolver's download step handles its
+  first try and its impersonated retry in one loop; the database
+  modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.
