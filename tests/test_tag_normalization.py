@@ -160,3 +160,11 @@ def test_upload_route_end_to_end(client, logged_in):
         'files': (_png(), 'spaced.png'),
     }, content_type='multipart/form-data', follow_redirects=True)
     assert get_media_count(include_tags='beta') == 1
+
+
+def test_with_user_tag_adds_the_owner_once():
+    from app.media.tagging import with_user_tag
+    assert with_user_tag(' beach , ,sun', 'bob') == ['beach', 'sun', 'user:bob']
+    assert with_user_tag('user:bob,beach', 'bob') == ['user:bob', 'beach']
+    assert with_user_tag('user:bobby', 'bob') == ['user:bobby', 'user:bob']
+    assert with_user_tag(None, None) == []

@@ -10,10 +10,8 @@
     body.is-feed-fullscreen { --feed-nav-h: 0px; }
 
     html, body { height: 100%; overflow: hidden; }
+    /* Plain black: the global gradient is absent on the feed. */
     body { background: #000; }
-
-    /* Make the global gradient absent on feed */
-    body { background-image: none; }
 
     .feed-container {
         height: calc(100vh - var(--feed-nav-h));

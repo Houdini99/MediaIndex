@@ -31,6 +31,22 @@ class Cancelled(Exception):
     """Raised when `keepalive` asked the call to stop."""
 
 
+class Deadline:
+    """One time budget shared by several calls on the same file. `left()`
+    returns the seconds remaining, to pass as the next call's timeout, and
+    raises TimeoutError(message) once the budget is spent."""
+
+    def __init__(self, timeout, message):
+        self._end = time.monotonic() + timeout
+        self._message = message
+
+    def left(self):
+        remaining = self._end - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(self._message)
+        return remaining
+
+
 def run(args, timeout, keepalive=None, what='ffmpeg'):
     """Run `args`, returning its stdout; kill it past `timeout` seconds.
 

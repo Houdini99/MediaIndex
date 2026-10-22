@@ -7,7 +7,6 @@ import io
 import logging
 import os
 import re
-import time
 
 from PIL import Image, ImageOps, ImageSequence
 
@@ -150,13 +149,7 @@ def gen_video_thumb(src, dst, timeout=None):
     from . import ffmpeg
     if timeout is None:
         timeout = Config.VIDEO_THUMB_TIMEOUT
-    deadline = time.monotonic() + timeout
-
-    def left():
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(f'no frame decoded within {timeout:.0f}s')
-        return remaining
+    left = ffmpeg.Deadline(timeout, f'no frame decoded within {timeout:.0f}s').left
 
     try:
         dur = ffmpeg.duration(src, left())

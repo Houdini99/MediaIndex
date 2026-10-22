@@ -24,7 +24,7 @@ from psycopg.rows import dict_row
 from ..config import Config
 from ..db_utils import db_conn, db_now, like_escape
 from ..files import remove_if_exists
-from .tagging import tag_list, tag_str
+from .tagging import tag_list, tag_str, with_user_tag
 
 #: Explicit column list for every media read, so callers see a stable set of
 #: names regardless of the table's physical column order.
@@ -374,11 +374,7 @@ def insert_media(fp, th, tags, fh, uid, is_private=False):
         # form value of "alpha, beta" stored verbatim makes `beta`
         # unfindable forever. Doing it here covers the upload route, the
         # staging promote and the bot's API upload in one place.
-        tag_parts = tag_list(tags)
-        # Exact membership rather than a substring test: `user:bob` is not
-        # already present just because `user:bobby` is.
-        if uname and f"user:{uname}" not in tag_parts:
-            tag_parts.append(f"user:{uname}")
+        tag_parts = with_user_tag(tags, uname)
         # Falls back to the original value so a tagless upload still stores
         # NULL rather than an empty string.
         tags = tag_str(tag_parts) if tag_parts else tags

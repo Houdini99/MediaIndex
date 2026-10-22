@@ -29,20 +29,17 @@ def build_media_event(filepath, thumb, filehash, tags, uid, upload_date):
     """Assemble a media_added payload, or None on any failure.
 
     `tags` should be the same string handed to insert_media(); the
-    user:<name> tag is re-appended here to mirror what insert_media stores.
+    user:<name> tag is added here the same way insert_media adds it.
     """
     try:
         # Local imports: app.media.routes imports this module, so pulling
         # the media package in at import time is circular.
         from .media.db import get_username_by_id
-        from .media.tagging import tag_list, tag_str
+        from .media.tagging import tag_str, with_user_tag
         uname = get_username_by_id(uid)
-        # Same normalization and same exact-membership test as insert_media,
-        # so the announced tags are byte-identical to the stored ones.
-        tag_parts = tag_list(tags)
-        if uname and f"user:{uname}" not in tag_parts:
-            tag_parts.append(f"user:{uname}")
-        tags = tag_str(tag_parts)
+        # The same helper as insert_media, so the announced tags are
+        # byte-identical to the stored ones.
+        tags = tag_str(with_user_tag(tags, uname))
         return {
             'event': 'media_added',
             'filepath': os.path.basename(filepath),

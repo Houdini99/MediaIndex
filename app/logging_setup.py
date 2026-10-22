@@ -207,9 +207,9 @@ def _start_rotation_timer(handler):
     threading.Thread(target=loop, name='log-rotation', daemon=True).start()
 
 
-def configure_logging(base_dir):
-    """Set up rotating file logging and redirect stdout/stderr through it."""
-    log_dir = os.path.join(base_dir, 'log')
+def configure_logging(log_dir):
+    """Set up rotating file logging in `log_dir` (Config.LOG_FOLDER) and
+    redirect stdout/stderr through it."""
     os.makedirs(log_dir, exist_ok=True)
 
     # Set up logger for stdout

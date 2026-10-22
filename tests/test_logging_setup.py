@@ -36,7 +36,7 @@ def logfile(tmp_path):
         for name in ('STDOUT', 'STDERR')
     }
 
-    configure_logging(str(tmp_path))
+    configure_logging(str(tmp_path / 'log'))
     # pytest reinstalls its own capture objects on sys.stdout/sys.stderr
     # between fixture setup and the test body, so hand the wrappers that
     # configure_logging built to the test directly.

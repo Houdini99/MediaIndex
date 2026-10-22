@@ -120,3 +120,11 @@ def test_no_moviepy_anywhere():
     import app.media.tasks  # noqa: F401
     assert 'moviepy' not in sys.modules
     assert not hasattr(processing, 'gen_video_thumb_isolated')
+
+
+def test_a_deadline_counts_down_and_then_raises_its_message():
+    deadline = ffmpeg.Deadline(30, 'out of time')
+    assert 29 < deadline.left() <= 30
+    spent = ffmpeg.Deadline(0, 'no frame decoded within 0s')
+    with pytest.raises(TimeoutError, match='no frame decoded within 0s'):
+        spent.left()

@@ -16,7 +16,6 @@ is found by the same code that finds two re-encodes of that clip.
 
 Pure I/O and arithmetic: no Flask, no SQL, mirroring processing.py.
 """
-import time
 
 import numpy as np
 from PIL import Image, ImageSequence
@@ -133,15 +132,9 @@ def hash_video_frames(path, count=DEFAULT_VIDEO_FRAMES, timeout=180.0,
     """
     from . import ffmpeg
 
-    deadline = time.monotonic() + timeout
-
-    def left():
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(
-                f'gave up after {timeout:.0f}s — the video decoder stopped '
-                'responding')
-        return remaining
+    left = ffmpeg.Deadline(
+        timeout, f'gave up after {timeout:.0f}s — the video decoder stopped '
+                 'responding').left
 
     duration = ffmpeg.duration(path, left(), keepalive)
     if not duration:

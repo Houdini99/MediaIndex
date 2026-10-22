@@ -77,7 +77,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   helper (`app/files.py`), with one function each for a media item's
   files and a staged thumbnail; the duplicate finder reads its settings
   in one place, and the admin's user actions look each account up once;
-  the database modules lost their
+  the two video decodes share one deadline (`ffmpeg.Deadline`), the
+  stored item and its announcement one `user:<name>` helper, and logging
+  takes its folder from `LOG_FOLDER`; the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.

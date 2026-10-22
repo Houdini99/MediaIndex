@@ -28,3 +28,14 @@ def tag_list(tags):
 def tag_str(tags):
     """List of tags → the stored comma-separated form. Inverse of tag_list."""
     return ','.join(tags)
+
+
+def with_user_tag(tags, username):
+    """tag_list(tags) plus `user:<username>`, the tag that names an item's
+    owner, unless it is already there. Exact membership rather than a
+    substring test: `user:bob` is not present just because `user:bobby` is.
+    """
+    parts = tag_list(tags)
+    if username and f"user:{username}" not in parts:
+        parts.append(f"user:{username}")
+    return parts

@@ -5,7 +5,6 @@ Calling pattern:
   python run.py                        # local dev server
   flask --app run:app run ...          # Flask CLI also works (app is exposed)
 """
-import os
 import socket
 
 from app.logging_setup import configure_logging
@@ -27,7 +26,7 @@ def get_lan_ip():
 
 # ── Configure logging BEFORE creating the app so the redirected
 #    stdout/stderr captures any startup output. ────────────────────────────
-configure_logging(os.path.dirname(os.path.abspath(__file__)))
+configure_logging(Config.LOG_FOLDER)
 
 app = create_app()
 
