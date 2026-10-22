@@ -9,6 +9,7 @@ import time
 
 from ..auth.db import get_user_enc_key
 from ..config import Config
+from ..files import remove_if_exists
 from ..media.crypto import ENC_SUFFIX, NONCE_BYTES, strip_enc
 from ..media.db import (
     delete_media_rows, get_all_media_paths, get_privacy_for_file, media_path,
@@ -111,9 +112,7 @@ def cleanup_missing_rows():
     missing = scan()['missing_rows']
     for _, _, th in missing:
         if th:
-            thumb_path = os.path.join(Config.THUMB_FOLDER, os.path.basename(th))
-            if os.path.exists(thumb_path):
-                os.remove(thumb_path)
+            remove_if_exists(thumb_path(th))
     return delete_media_rows([mid for mid, _, _ in missing])
 
 
@@ -148,21 +147,16 @@ def rerender_placeholder_thumbs():
     return queued, rerendered, failed
 
 
+def _remove_orphans(key, folder):
+    """Delete the files scan() lists under `key` from `folder`; returns
+    how many were removed."""
+    return sum(remove_if_exists(os.path.join(folder, name))
+               for name, _ in scan()[key])
+
+
 def cleanup_orphan_files():
-    removed = 0
-    for name, _ in scan()['orphan_files']:
-        path = os.path.join(Config.UPLOAD_FOLDER, name)
-        if os.path.exists(path):
-            os.remove(path)
-            removed += 1
-    return removed
+    return _remove_orphans('orphan_files', Config.UPLOAD_FOLDER)
 
 
 def cleanup_orphan_thumbs():
-    removed = 0
-    for name, _ in scan()['orphan_thumbs']:
-        path = os.path.join(Config.THUMB_FOLDER, name)
-        if os.path.exists(path):
-            os.remove(path)
-            removed += 1
-    return removed
+    return _remove_orphans('orphan_thumbs', Config.THUMB_FOLDER)

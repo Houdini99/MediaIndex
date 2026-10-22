@@ -23,6 +23,7 @@ from psycopg.rows import dict_row
 
 from ..config import Config
 from ..db_utils import db_conn, db_now, like_escape
+from ..files import remove_if_exists
 from .tagging import tag_list, tag_str
 
 #: Explicit column list for every media read, so callers see a stable set of
@@ -413,16 +414,16 @@ def delete_media(mid, user_id, is_admin=False):
     # media_path/thumb_path keep only the file name, so the real file in the
     # configured folders is deleted whatever form the stored value has
     # (same as serving).
-    _remove_files(row[0], row[1])
+    remove_media_files(row[0], row[1])
     return True
 
 
-def _remove_files(filepath, thumb):
+def remove_media_files(filepath, thumb):
     """Delete a media row's file and thumbnail from disk, if present."""
-    for p in (media_path(filepath) if filepath else None,
-              thumb_path(thumb) if thumb else None):
-        if p and os.path.exists(p):
-            os.remove(p)
+    if filepath:
+        remove_if_exists(media_path(filepath))
+    if thumb:
+        remove_if_exists(thumb_path(thumb))
 
 
 # ── Admin: bulk tag operations (also driven by scripts/rename_tag.py and
@@ -590,5 +591,5 @@ def delete_media_for_user(uid):
     rows = get_media_owned_by(uid)
     deleted = delete_media_rows([r[0] for r in rows])
     for _, fp, th, _ in rows:
-        _remove_files(fp, th)
+        remove_media_files(fp, th)
     return deleted

@@ -73,7 +73,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (the forms, their inputs and `set_password.py`); logging out leaves
   deleting the session cookie to Flask; the gallery page and its API
   read their filters in one place, and a private file is served after
-  one database lookup instead of two; the database modules lost their
+  one database lookup instead of two; files are deleted through one
+  helper (`app/files.py`), with one function each for a media item's
+  files and a staged thumbnail; the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.
@@ -88,6 +90,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A file that disappeared between the app's check and its delete (for
+  example a queued file deleted over WebDAV while it was being rejected
+  in the queue) made the request fail with a server error. Deleting
+  something that is already gone is no longer an error.
 - The Telegram bot gave no answer at all when the index's reply to its
   account lookup was unreadable; it logged an unhandled error. It now
   tells the sender it can't reach the index right now, as for any other

@@ -12,6 +12,7 @@ from datetime import datetime
 
 from ..auth.db import get_or_create_user_enc_key, get_user_enc_key
 from ..config import Config
+from ..files import remove_if_exists
 from ..notifications import build_media_event, publish_event
 from .crypto import ENC_SUFFIX, decrypt_file, enc_name, encrypt_file, strip_enc
 from .db import (
@@ -101,8 +102,8 @@ def ingest_file(tmp_path, ext, tags, uid, is_private, premade_thumb=None,
             # owning user (backups, rsync) would silently skip them.
             os.chmod(final, 0o644)
     finally:
-        if is_private and os.path.exists(plain_thumb):
-            os.remove(plain_thumb)
+        if is_private:
+            remove_if_exists(plain_thumb)
 
     # The type (image/gif/video) is added as a tag unless the uploader
     # already typed it; tag search ignores case, so this check does too.
@@ -128,8 +129,8 @@ def ingest_file(tmp_path, ext, tags, uid, is_private, premade_thumb=None,
     # row itself references (same hash means the loser's paths usually
     # ARE the winner's files).
     for p in (final, tpath):
-        if p and os.path.exists(p) and not get_privacy_for_file(os.path.basename(p)):
-            os.remove(p)
+        if os.path.exists(p) and not get_privacy_for_file(os.path.basename(p)):
+            remove_if_exists(p)
     return 'duplicate', fh
 
 
@@ -183,18 +184,15 @@ def set_media_privacy(mid, private, user_id, is_admin=False):
             converted.append((src, dst))
     except Exception:
         for _, dst in converted:
-            if os.path.exists(dst):
-                os.remove(dst)
+            remove_if_exists(dst)
         return False
 
     # Point the row at the converted names first, then drop the old files —
     # a crash in between leaves stale extra files, never a broken row.
     if not set_media_paths_privacy(mid, new_fp, new_th, private):
         for _, dst in converted:
-            if os.path.exists(dst):
-                os.remove(dst)
+            remove_if_exists(dst)
         return False
     for src, _ in converted:
-        if os.path.exists(src):
-            os.remove(src)
+        remove_if_exists(src)
     return True

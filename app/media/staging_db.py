@@ -20,6 +20,7 @@ from psycopg.rows import dict_row
 
 from ..config import Config
 from ..db_utils import db_conn, db_now
+from ..files import remove_if_exists
 
 
 def staging_file_path(user_id, fname):
@@ -30,6 +31,12 @@ def staging_file_path(user_id, fname):
 def staging_thumb_path(thumb):
     """Absolute path in STAGING_THUMB_DIR for a stored thumb value."""
     return os.path.join(Config.STAGING_THUMB_DIR, os.path.basename(thumb))
+
+
+def remove_staging_thumb(thumb):
+    """Delete a staged thumbnail from disk, if the row has one."""
+    if thumb:
+        remove_if_exists(staging_thumb_path(thumb))
 
 
 # ── Scanner queries ────────────────────────────────────────────────────────

@@ -49,7 +49,7 @@ from ..auth.db import (
 from ..config import Config
 from .. import security_log
 from ..security_log import log_event
-from ..media.staging_db import delete_staging_for_user, staging_thumb_path
+from ..media.staging_db import delete_staging_for_user, remove_staging_thumb
 from ..media.db import (
     rename_tag,
     remove_tag,
@@ -60,6 +60,7 @@ from ..media.db import (
     delete_media_for_user,
     delete_media_rows,
     media_path,
+    remove_media_files,
     thumb_path,
 )
 
@@ -172,11 +173,8 @@ def _reassign_user_media(old_uid, new_uid):
                     if path and path.endswith(ENC_SUFFIX) and os.path.exists(path):
                         _reencrypt_file(path, old_key, new_key)
         else:
-            for mid, fp, th, _ in private_rows:
-                for path in (media_path(fp) if fp else None,
-                             thumb_path(th) if th else None):
-                    if path and os.path.exists(path):
-                        os.remove(path)
+            for _, fp, th, _ in private_rows:
+                remove_media_files(fp, th)
             delete_media_rows([r[0] for r in private_rows])
     return reassign_media_owner(old_uid, new_uid)
 
@@ -215,9 +213,7 @@ def remove_user(user_id):
     # digit-named directory forever — and on Postgres the staging.user_id
     # FK would make every re-registration fail loudly.
     for thumb in delete_staging_for_user(user_id):
-        tpath = staging_thumb_path(thumb)
-        if os.path.exists(tpath):
-            os.remove(tpath)
+        remove_staging_thumb(thumb)
     shutil.rmtree(os.path.join(Config.STAGING_DIR, str(user_id)),
                   ignore_errors=True)
 

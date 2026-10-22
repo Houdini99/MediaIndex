@@ -24,6 +24,7 @@ import queue
 import threading
 
 from ..config import Config
+from ..files import remove_if_exists
 from .crypto import encrypt_file, plaintext_copy, strip_enc
 from .db import replace_thumb
 
@@ -104,14 +105,12 @@ def _process(src_path, thumb_dst, key):
             return None
         swapped = replace_thumb(thumb_dst, new_dst)
     except BaseException:
-        if os.path.exists(new_dst):
-            os.remove(new_dst)
+        remove_if_exists(new_dst)
         raise
     if not swapped:
         os.remove(new_dst)
         return None
-    if os.path.exists(thumb_dst):
-        os.remove(thumb_dst)
+    remove_if_exists(thumb_dst)
     return os.path.basename(new_dst)
 
 
@@ -133,5 +132,4 @@ def _render(src_path, thumb_dst, key):
             gen_video_thumb(tmp_src, tmp_thumb)
         encrypt_file(tmp_thumb, thumb_dst, key)
     finally:
-        if os.path.exists(tmp_thumb):
-            os.remove(tmp_thumb)
+        remove_if_exists(tmp_thumb)

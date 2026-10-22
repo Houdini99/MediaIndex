@@ -16,6 +16,7 @@ from typing import Iterator, Optional
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from ..config import Config
+from ..files import remove_if_exists
 
 KEY_BYTES = 32          # AES-256
 NONCE_BYTES = 16        # AES block size; serves as initial counter block
@@ -137,5 +138,4 @@ def plaintext_copy(src_path: str, key: bytes, name: str) -> Iterator[str]:
         decrypt_file(src_path, tmp, key)
         yield tmp
     finally:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(tmp)
+        remove_if_exists(tmp)

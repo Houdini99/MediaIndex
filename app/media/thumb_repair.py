@@ -25,6 +25,7 @@ from PIL import Image
 
 from ..auth.db import get_user_enc_key
 from ..config import Config
+from ..files import remove_if_exists
 from .crypto import encrypt_file, plaintext_copy, strip_enc
 from .db import get_image_rows, media_path, replace_thumb, thumb_path
 from .dupes_db import forget_hashes
@@ -73,20 +74,16 @@ def _swap_in(plain_src, old, key, tag):
         else:
             _render(plain_src, new_abs)
     except Exception as exc:
-        if os.path.exists(new_abs):
-            os.remove(new_abs)
+        remove_if_exists(new_abs)
         return None, f'render failed: {type(exc).__name__}: {exc}'
     finally:
-        if os.path.exists(tmp_thumb):
-            os.remove(tmp_thumb)
+        remove_if_exists(tmp_thumb)
     if not replace_thumb(old, new):
         # Deleted, or privacy flipped (which renames the thumbnail), while
         # this ran — leave that row to its new state.
         os.remove(new_abs)
         return None, 'row changed meanwhile'
-    old_abs = thumb_path(old)
-    if os.path.exists(old_abs):
-        os.remove(old_abs)
+    remove_if_exists(thumb_path(old))
     return new, None
 
 

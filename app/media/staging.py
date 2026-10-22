@@ -114,10 +114,7 @@ def _reconcile(rows):
 
 
 def _drop_row(sid, thumb):
-    if thumb:
-        tpath = staging_db.staging_thumb_path(thumb)
-        if os.path.exists(tpath):
-            os.remove(tpath)
+    staging_db.remove_staging_thumb(thumb)
     staging_db.delete_staging_row(sid)
 
 

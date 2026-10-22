@@ -34,6 +34,7 @@ from ..auth.db import (
 from ..auth.routes import login_required
 from ..config import Config
 from ..extensions import limiter
+from ..files import remove_if_exists
 from ..request_parsing import form_flag
 from ..security_log import log_event
 
@@ -46,13 +47,6 @@ def _own_staging_path(row):
     if os.path.commonpath([user_root, path]) != user_root:
         abort(404)
     return path
-
-
-def _remove_staging_thumb(row):
-    if row.get('thumb'):
-        tpath = staging_db.staging_thumb_path(row['thumb'])
-        if os.path.exists(tpath):
-            os.remove(tpath)
 
 
 def _row_json(row):
@@ -151,7 +145,7 @@ def staging_promote(sid):
         path = _own_staging_path(row)
         if not os.path.isfile(path):
             # Deleted via DAV after the queue page loaded.
-            _remove_staging_thumb(row)
+            staging_db.remove_staging_thumb(row['thumb'])
             staging_db.delete_staging_row(sid)
             return jsonify({'error': 'file no longer in WebDAV folder'}), 410
         # Guard against promoting a file that is still being written: a
@@ -182,7 +176,7 @@ def staging_promote(sid):
         status, _fh = ingest_file(tmp, ext, tags, g.user['id'], is_private,
                                   premade_thumb=premade)
         # Either way the file has left staging: clear the queue entry.
-        _remove_staging_thumb(row)
+        staging_db.remove_staging_thumb(row['thumb'])
         staging_db.delete_staging_row(sid)
         return jsonify({'status': status})
     except Exception:
@@ -197,9 +191,9 @@ def staging_reject(sid):
     if not row:
         abort(404)
     path = _own_staging_path(row)
-    if os.path.isfile(path):
-        os.remove(path)
-    _remove_staging_thumb(row)
+    if os.path.isfile(path):       # never a directory put in its place
+        remove_if_exists(path)     # the user may delete it over DAV meanwhile
+    staging_db.remove_staging_thumb(row['thumb'])
     staging_db.delete_staging_row(sid)
     return jsonify({'status': 'rejected'})
 
