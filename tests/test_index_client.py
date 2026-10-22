@@ -197,6 +197,19 @@ def test_cooldown_expires(tmp_path):
     assert run(client.upload(str(f), 'pic.png', 'cats')).status == 'ok'
 
 
+def test_blocked_says_how_long_the_cooldown_has_left(tmp_path):
+    """The bots' only backoff clock: they ask it before starting work."""
+    f = tmp_path / 'pic.png'
+    f.write_bytes(b'x')
+    client = _api_client(FakeResponse(status=401), auth_cooldown=900)
+    assert client.blocked() == 0
+    with pytest.raises(AuthError):
+        run(client.upload(str(f), 'pic.png', 'cats'))
+    assert 890 < client.blocked() <= 900
+    client._blocked_until = 0        # pretend the cooldown elapsed
+    assert client.blocked() == 0
+
+
 # ── Discord identity lookup ───────────────────────────────────────────────
 def _lookup_client(response):
     seen = {}

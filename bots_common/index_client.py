@@ -6,7 +6,8 @@ is no login step and no session to keep alive. What guards the IP ban (10
 failed logins in 15 minutes ban the container for 24 hours) is the
 cooldown: after a rejected credential, callers are refused locally
 instead of being retried against the server, so a burst of ingests can't
-spend that budget in one second.
+spend that budget in one second. It is the bots' only backoff clock:
+they ask `blocked()` before starting work.
 
 The bots hold no database credentials (Postgres is confined to the
 `backend` network), so "which index account linked this chat account?"
@@ -98,9 +99,14 @@ class IndexClient:
         rejection so a burst of ingests can't spend the ban budget."""
         self._blocked_until = time.monotonic() + self._cooldown
 
+    def blocked(self):
+        """Seconds left on the cooldown, or 0. The bots ask this before
+        starting work that would only end in the index refusing it."""
+        return max(0.0, self._blocked_until - time.monotonic())
+
     def _raise_if_blocked(self):
-        remaining = self._blocked_until - time.monotonic()
-        if remaining > 0:
+        remaining = self.blocked()
+        if remaining:
             raise AuthError(
                 f"the index rejected these credentials; not retrying for "
                 f"another {remaining:.0f}s (repeated failures would IP-ban "

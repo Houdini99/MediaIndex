@@ -25,7 +25,6 @@ import contextlib
 import logging
 import os
 import tempfile
-import time
 import uuid
 
 import aiohttp
@@ -109,7 +108,6 @@ class IndexBot(discord.Client):
                                  config.INDEX_BOT_APP_PASSWORD,
                                  auth_cooldown=config.AUTH_RETRY_SECONDS,
                                  lookup_ttl=config.LOOKUP_TTL)
-        self._auth_backoff_until = 0.0
         # Strong references: asyncio only weakly references scheduled
         # tasks, so without these the GC destroys the loops mid-await.
         self._notify_task = None
@@ -337,11 +335,7 @@ class IndexBot(discord.Client):
             if await self.index.lookup_discord_user(message.author.id):
                 return True
         except AuthError:
-            logging.exception("dm: index auth failed; backing off %ss",
-                              config.AUTH_RETRY_SECONDS)
-            self._auth_backoff_until = (time.monotonic()
-                                        + config.AUTH_RETRY_SECONDS)
-            outcome = _Outcome(BACKOFF, True, "the index rejected our login")
+            outcome = await self._auth_failed(message, 'dm')
         except IndexUnavailable as e:
             outcome = _Outcome(ERROR, True, f"couldn't look up your account "
                                             f"— {e}")
@@ -431,12 +425,9 @@ class IndexBot(discord.Client):
             if tags is None:
                 await self._apply_pending_tags(message)
             return
-        if time.monotonic() < self._auth_backoff_until:
-            await self._react(message, BACKOFF)
-            await self._settle(
-                message,
-                [_Outcome(BACKOFF, True, "the index login is backing off")],
-                attempts, user_tags)
+        backoff = await self._backing_off(message)
+        if backoff:
+            await self._settle(message, [backoff], attempts, user_tags)
             return
         if tags is None and message.message_snapshots and not user_tags \
                 and config.FORWARD_TAG_WAIT > 0:
@@ -444,12 +435,40 @@ class IndexBot(discord.Client):
             # grace window to post the tag list as the next message.
             self._schedule_forward_ingest(message, sources, attempts)
             return
+        await self._ingest_all(message, sources, user_tags, attempts)
+
+    async def _ingest_all(self, message, sources, tags, attempts):
+        """Ingest each source with the same tags, react with each outcome,
+        and settle the message."""
         outcomes = []
         for src in sources:
-            outcome = await self._ingest(src, message, user_tags)
+            outcome = await self._ingest(src, message, tags)
             await self._react(message, outcome.emoji)
             outcomes.append(outcome)
-        await self._settle(message, outcomes, attempts, user_tags)
+        await self._settle(message, outcomes, attempts, tags)
+
+    # ── Index login backoff ────────────────────────────────────────────
+    async def _backing_off(self, message):
+        """While the index client cools down from a rejected app
+        password, nothing is tried: every call would be refused. Reacts ⏳
+        and returns the retryable outcome; None when not backing off."""
+        if not self.index.blocked():
+            return None
+        await self._react(message, BACKOFF)
+        return _Outcome(BACKOFF, True, "the index login is backing off")
+
+    async def _auth_failed(self, message, where, what=None):
+        """The index rejected the app password (the client starts its
+        cooldown). Logs it, reports it on `what` (a file or link; without
+        one the caller reports the outcome itself) and returns the
+        retryable outcome, so the retry queue tries again later."""
+        wait = self.index.blocked()
+        logging.exception("%s: index auth failed; backing off %.0fs",
+                          where, wait)
+        if what:
+            await self._report(message, f"⏳ {what} — index login failed, "
+                                        f"backing off {wait:.0f}s")
+        return _Outcome(BACKOFF, True, "the index rejected our login")
 
     # ── Retry queue ────────────────────────────────────────────────────
     async def _settle(self, message, outcomes, attempts, tags):
@@ -488,7 +507,7 @@ class IndexBot(discord.Client):
         await self.wait_until_ready()
         while not self.is_closed():
             await asyncio.sleep(config.INGEST_RETRY_POLL)
-            if time.monotonic() < self._auth_backoff_until:
+            if self.index.blocked():
                 continue
             for entry in await self._retry.due():
                 try:
@@ -629,10 +648,9 @@ class IndexBot(discord.Client):
             return False, []
         # Checked before anything downloads, so no transfer is spent on a
         # file the index cannot accept right now.
-        if time.monotonic() < self._auth_backoff_until:
-            await self._react(message, BACKOFF)
-            return True, [_Outcome(BACKOFF, True,
-                                   "the index login is backing off")]
+        backoff = await self._backing_off(message)
+        if backoff:
+            return True, [backoff]
         await self._react(message, DOWNLOADING)
         outcomes = []
         try:
@@ -674,15 +692,7 @@ class IndexBot(discord.Client):
                     config.YTDLP_COOKIES) as login:
                 res = await self._run_resolver(url, probe, login, message)
         except AuthError:
-            logging.exception("resolver: index auth failed fetching the "
-                              "site login; backing off %ss",
-                              config.AUTH_RETRY_SECONDS)
-            self._auth_backoff_until = (time.monotonic()
-                                        + config.AUTH_RETRY_SECONDS)
-            await self._report(
-                message, f"⏳ <{url}> — index login failed, backing off "
-                f"{config.AUTH_RETRY_SECONDS:g}s")
-            return _Outcome(BACKOFF, True, "the index rejected our login")
+            return await self._auth_failed(message, 'resolver', f"<{url}>")
         except IndexUnavailable as e:
             reason = f"couldn't fetch the site login — {e}"
             await self._report(message, f"❌ <{url}> — {reason}")
@@ -844,19 +854,11 @@ class IndexBot(discord.Client):
             lst.remove(entry)
             if not lst:
                 del self._pending_forwards[key]
-        if time.monotonic() < self._auth_backoff_until:
-            await self._react(message, BACKOFF)
-            await self._settle(
-                message,
-                [_Outcome(BACKOFF, True, "the index login is backing off")],
-                attempts, entry.tags)
+        backoff = await self._backing_off(message)
+        if backoff:
+            await self._settle(message, [backoff], attempts, entry.tags)
             return
-        outcomes = []
-        for att in attachments:
-            outcome = await self._ingest(att, message, entry.tags)
-            await self._react(message, outcome.emoji)
-            outcomes.append(outcome)
-        await self._settle(message, outcomes, attempts, entry.tags)
+        await self._ingest_all(message, attachments, entry.tags, attempts)
 
     # ── Ingest ─────────────────────────────────────────────────────────
     async def _ingest(self, att, message, user_tags):
@@ -907,14 +909,7 @@ class IndexBot(discord.Client):
                                              uploaded_for=uploaded_for,
                                              private=private)
         except AuthError:
-            logging.exception("ingest: index auth failed; backing off %ss",
-                              config.AUTH_RETRY_SECONDS)
-            self._auth_backoff_until = (time.monotonic()
-                                        + config.AUTH_RETRY_SECONDS)
-            await self._report(
-                message, f"⏳ {label} — index login failed, backing off "
-                f"{config.AUTH_RETRY_SECONDS:g}s")
-            return _Outcome(BACKOFF, True, "the index rejected our login")
+            return await self._auth_failed(message, 'ingest', label)
         except IndexUnavailable as e:
             reason = f"couldn't look up who posted it — {e}"
             await self._report(message, f"❌ {label} — {reason}")

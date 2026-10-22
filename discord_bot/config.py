@@ -92,10 +92,10 @@ EMBED_UNFURL_WAIT = 3.0
 # transfer. Attachments on Discord's own CDN are bounded by Discord's
 # upload limit instead.
 LINK_MAX_BYTES = int(env.num('DISCORD_LINK_MAX_MB', 512) * 1e6)
-# Backoff after a *failed* login: 10 failures within 15-minute windows get
-# the container's IP banned for 24h, so never retry hot. IndexClient also
-# enforces this itself, so concurrent ingests can't slip past the backoff
-# in the window between a rejection and the bot noticing it.
+# Backoff after a rejected app password: 10 failures within 15-minute
+# windows get the container's IP banned for 24h, so never retry hot. The
+# index client keeps this clock (bots_common/index_client.py), so
+# concurrent ingests can't slip past it.
 AUTH_RETRY_SECONDS = env.num('AUTH_RETRY_SECONDS', 900)
 
 # Ingests that fail for a *transient* reason (index login backing off, a

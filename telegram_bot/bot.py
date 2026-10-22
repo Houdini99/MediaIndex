@@ -23,7 +23,6 @@ import html
 import logging
 import os
 import tempfile
-import time
 import uuid
 
 import aiohttp
@@ -164,7 +163,6 @@ class IndexBot:
         # tasks, so without these the GC can destroy an album's flush
         # mid-await and the album is silently never ingested.
         self._album_tasks = set()
-        self._auth_backoff_until = 0.0
 
     # ── The ingest gate ────────────────────────────────────────────────
     async def _owner_for(self, user):
@@ -177,9 +175,8 @@ class IndexBot:
         try:
             return await self.index.lookup_telegram_user(user.id, user.username)
         except AuthError as e:
-            logging.error("gate: index auth failed; backing off %ss",
-                          config.AUTH_RETRY_SECONDS, exc_info=True)
-            self._auth_backoff_until = time.monotonic() + config.AUTH_RETRY_SECONDS
+            logging.error("gate: index auth failed; backing off %.0fs",
+                          self.index.blocked(), exc_info=True)
             raise IndexUnavailable("the index rejected the bot's login") from e
 
     async def _gate(self, message, user):
@@ -545,10 +542,8 @@ class IndexBot:
                 return await self._run_resolver(message, item, label, login)
         except AuthError:
             logging.error("resolver: index auth failed fetching the site "
-                          "login; backing off %ss", config.AUTH_RETRY_SECONDS,
+                          "login; backing off %.0fs", self.index.blocked(),
                           exc_info=True)
-            self._auth_backoff_until = (time.monotonic()
-                                        + config.AUTH_RETRY_SECONDS)
             await self._reply(
                 message, f"⏳ {label} — the index rejected my login. An "
                          f"admin needs to check the bot's app password.")
@@ -630,7 +625,7 @@ class IndexBot:
                 f"🚫 {label} is {parsing.human_size(item.size)}, over the "
                 f"{limit} limit.{extra}")
             return
-        if time.monotonic() < self._auth_backoff_until:
+        if self.index.blocked():
             await self._reply(
                 message, f"⏳ {label} — the index rejected my login; I am "
                          f"backing off. Try again shortly.")
@@ -656,10 +651,8 @@ class IndexBot:
                                                  uploaded_for=owner,
                                                  private=private)
             except AuthError:
-                logging.error("ingest: index auth failed; backing off %ss",
-                              config.AUTH_RETRY_SECONDS, exc_info=True)
-                self._auth_backoff_until = (time.monotonic()
-                                            + config.AUTH_RETRY_SECONDS)
+                logging.error("ingest: index auth failed; backing off %.0fs",
+                              self.index.blocked(), exc_info=True)
                 await self._reply(
                     message,
                     f"⏳ {label} — the index rejected my login. An admin "

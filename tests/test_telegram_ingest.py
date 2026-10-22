@@ -23,7 +23,7 @@ import pytest
 from redis.exceptions import ResponseError
 from telegram.error import TelegramError
 
-from bots_common.index_client import IndexUnavailable
+from bots_common.index_client import AuthError, IndexUnavailable
 from telegram_bot import config
 from telegram_bot.bot import IndexBot, extract_item
 from telegram_bot.pending import PendingStore
@@ -119,12 +119,17 @@ class FakeIndex:
         self.owner = owner
         self.status = status
         self.raises = raises
+        self.cooldown = 0.0           # seconds the client still refuses
+        self.upload_raises = None
         self.uploads = []
         self.lookups = []
         self.login = None
         self.login_raises = None
         self.login_requests = []
         self.stored_logins = []
+
+    def blocked(self):
+        return self.cooldown
 
     async def site_login(self, url):
         self.login_requests.append(url)
@@ -144,6 +149,8 @@ class FakeIndex:
 
     async def upload(self, path, filename, tags, uploaded_for=None,
                      private=False):
+        if self.upload_raises is not None:
+            raise self.upload_raises
         self.uploads.append({'filename': filename, 'tags': tags,
                              'uploaded_for': uploaded_for, 'private': private})
         return _Result(self.status)
@@ -498,6 +505,24 @@ def test_an_outage_is_not_cached_as_a_verdict(bot, ctx):
     bot.index.raises = None
     run(bot.on_media(FakeUpdate(photo_message(caption='cats')), ctx))
     assert len(bot.index.uploads) == 1
+
+
+# ── The index login backoff ───────────────────────────────────────────────
+def test_nothing_is_fetched_while_the_client_cools_down(bot, ctx):
+    """The client's cooldown is the bot's only clock: the file is not even
+    downloaded while the upload would be refused."""
+    bot.index.cooldown = 600
+    msg = photo_message(caption='cats')
+    run(bot.on_media(FakeUpdate(msg), ctx))
+    assert ctx.fetched == [] and bot.index.uploads == []
+    assert 'backing off' in msg.replies[0]
+
+
+def test_a_rejected_app_password_is_reported(bot, ctx):
+    bot.index.upload_raises = AuthError('rejected')
+    msg = photo_message(caption='cats')
+    run(bot.on_media(FakeUpdate(msg), ctx))
+    assert "check the bot's app password" in msg.replies[-1]
 
 
 def test_start_still_helps_while_the_index_is_down(bot, ctx):

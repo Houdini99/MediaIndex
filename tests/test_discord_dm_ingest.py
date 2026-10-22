@@ -74,10 +74,14 @@ class FakeIndex:
         self.links = links if links is not None else {}
         self.result = result or UploadResult('ok', filehash='abc')
         self.lookup_error = None
+        self.cooldown = 0.0           # seconds the client still refuses
         self.lookups = []
         self.uploads = []
         self.codes = {}               # code -> username it links to
         self.redeemed = []
+
+    def blocked(self):
+        return self.cooldown
 
     async def verify_discord_link(self, discord_id, code):
         self.redeemed.append((discord_id, code))
@@ -132,7 +136,6 @@ def bot(monkeypatch):
     b = botmod.IndexBot.__new__(botmod.IndexBot)
     b.user = types.SimpleNamespace(id=1)
     b.index = FakeIndex(links={42: 'alice'})
-    b._auth_backoff_until = 0.0
     b._retry = FakeQueue()
     b.guild = FakeGuild({42: types.SimpleNamespace(
         id=42, roles=[role(5, 'Verified')])})
@@ -262,11 +265,29 @@ def test_an_unreachable_index_queues_the_dm_instead_of_refusing_it(bot):
     assert bot.logs == []
 
 
-def test_a_rejected_app_password_on_the_lookup_arms_the_backoff(bot):
+def test_a_rejected_app_password_on_the_lookup_is_retried_later(bot):
+    """The client starts its cooldown; the bot only queues the DM."""
     bot.index.lookup_error = AuthError("rejected")
-    handle(bot, dm())
-    assert bot._auth_backoff_until > 0
-    assert bot.reactions[0] == botmod.BACKOFF
+    msg = dm()
+    handle(bot, msg)
+    assert bot.reactions == [botmod.BACKOFF, botmod.QUEUED]
+    assert bot._retry.calls == ["the index rejected our login"]
+    assert "⏳ the index rejected our login" in msg.channel.sent
+
+
+def test_nothing_is_tried_while_the_client_cools_down(bot):
+    """The client's cooldown is the bot's only clock: a message that
+    arrives during it is queued, not downloaded or uploaded."""
+    bot.index.cooldown = 600
+
+    async def gather(message):
+        return [_att()], '', []
+
+    bot._gather_sources = gather
+    run(botmod.IndexBot._handle_message(bot, channel_message()))
+    assert bot.reactions == [botmod.BACKOFF, botmod.QUEUED]
+    assert bot._retry.calls == ["the index login is backing off"]
+    assert bot.downloads == [] and bot.index.uploads == []
 
 
 # ── Ownership in _ingest ──────────────────────────────────────────────────

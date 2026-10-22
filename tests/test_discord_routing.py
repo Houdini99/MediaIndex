@@ -54,8 +54,12 @@ class FakeIndex:
     def __init__(self, login=None, raises=None):
         self.login = login
         self.raises = raises
+        self.cooldown = 0.0           # seconds the client still refuses
         self.asked = []
         self.stored = []
+
+    def blocked(self):
+        return self.cooldown
 
     async def site_login(self, url):
         self.asked.append(url)
@@ -76,7 +80,6 @@ def _login():
 def bot(monkeypatch):
     """An IndexBot with only the collaborators the link path touches."""
     b = botmod.IndexBot.__new__(botmod.IndexBot)
-    b._auth_backoff_until = 0.0
     b.index = FakeIndex()
     b.reactions, b.removed, b.logs, b.ingested = [], [], [], []
 
@@ -259,7 +262,6 @@ def test_a_rejected_index_login_backs_off_and_resolves_nothing(bot, ytdlp):
     outcome = run(bot._resolve_one(YOUTUBE, False, FakeMessage(), []))
 
     assert outcome.emoji == botmod.BACKOFF and outcome.retryable is True
-    assert bot._auth_backoff_until > time.monotonic()
     assert ytdlp.calls == []
 
 
@@ -368,7 +370,7 @@ def test_a_probe_that_hangs_is_retryable(bot, ytdlp, monkeypatch):
 
 # ── The message-level wrapper ─────────────────────────────────────────────
 def test_the_index_backoff_short_circuits_before_any_download(bot, ytdlp):
-    bot._auth_backoff_until = time.monotonic() + 900
+    bot.index.cooldown = 900
 
     handled, outcomes = run(bot._resolve_and_ingest(
         FakeMessage(), [YOUTUBE], []))

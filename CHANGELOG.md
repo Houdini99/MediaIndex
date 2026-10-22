@@ -27,6 +27,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The gallery, feed and lightbox APIs read each item's stored type instead
   of working it out from the file name for every row, and the duplicate
   finder counts items per type in one query.
+- After the index rejects a bot's app password, the bot pauses for
+  `AUTH_RETRY_SECONDS` counted from that rejection, and its "backing off"
+  lines name the seconds actually left. Before, the bots kept a second
+  clock that each message arriving during the pause could start over
+  (a DM, or a Telegram sender whose account link was not cached), so a
+  busy bot stayed paused for longer.
 - When the index answers an upload with 404 (in practice a wrong
   `INDEX_INTERNAL_URL`), the Discord bot fails that file with "the index
   returned HTTP 404", like the Telegram bot and any other refused upload.
