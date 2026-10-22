@@ -157,7 +157,7 @@ answered with a message pointing to the [WebDAV inbox](webdav.md).
 
 | Symptom in the bot's log | Cause |
 |---|---|
-| `gunicorn … RuntimeError: SECRET_KEY environment variable is not set` | The image tagged `index-telegram-bot` is the web app, built from the wrong Dockerfile. Rebuild with `./build.sh telegram`. `docker image inspect index-telegram-bot:latest --format '{{.Config.Cmd}}'` should show `telegram_bot.bot`. |
+| `gunicorn … RuntimeError: SECRET_KEY environment variable is not set` | The image tagged `index-telegram-bot` is the web app, built from the wrong Dockerfile. Rebuild with `./build.sh telegram`. `docker image inspect index-telegram-bot:latest --format '{{.Config.Env}}'` should list `BOT_MODULE=telegram_bot.bot`. |
 | `RuntimeError: TELEGRAM_BOT_TOKEN environment variable is not set` | The token is unset. Only this container stops; the rest of the stack keeps running. |
 | `the index rejected the app password … DELEGATED_UPLOADERS` | The bot's account isn't in `DELEGATED_UPLOADERS`, or its app password is wrong. |
 | The bot answers `/start` but indexes nothing | The sender isn't linked on the settings page, or is linked to another index account. |

@@ -5,9 +5,8 @@
 # docker-compose.yml deploys *prebuilt* images rather than building them —
 # that is what keeps it usable as a Portainer web-editor stack — so the
 # three images below have to exist in the local daemon before the stack
-# comes up. Each Dockerfile documented its own build command and they were
-# copied out by hand one at a time; this is those commands, in one place,
-# with the arguments that are easy to forget.
+# comes up. This is their build commands in one place, with the arguments
+# that are easy to forget.
 #
 #   ./build.sh                  build all three
 #   ./build.sh web              build only index-app
@@ -27,11 +26,12 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 # name|tag|dockerfile. The name is what you type on the command line. Every
 # image builds from the repo root: the bots copy bots_common/ in beside their
-# own package, so their context cannot be their own directory any more.
+# own package, so their context cannot be their own directory. Both bots
+# build from one Dockerfile; the BOT build arg picks which.
 IMAGES=(
   "web|index-app:latest|Dockerfile"
-  "discord|index-discord-bot:latest|discord_bot/Dockerfile"
-  "telegram|index-telegram-bot:latest|telegram_bot/Dockerfile"
+  "discord|index-discord-bot:latest|bots_common/Dockerfile"
+  "telegram|index-telegram-bot:latest|bots_common/Dockerfile"
 )
 
 DOCKER_ARGS=()
@@ -92,15 +92,13 @@ build_one() {
   local name="$1" tag="$2" dockerfile="$3"
   local extra=()
 
-  # yt-dlp is pinned with a floor, not an exact version, because sites
-  # break old extractors constantly — but pip's layer is cached on
-  # requirements.txt, which never changes, so a plain rebuild would reuse a
-  # months-old resolver. Changing this arg busts the cache from there down.
-  # This is the argument that gets forgotten when building by hand: both
-  # bot Dockerfiles declare it, and a bot built without it stays on
-  # whatever yt-dlp it was first built with.
+  # BOT picks the bot. YTDLP_REFRESH is the argument that gets forgotten
+  # when building by hand: yt-dlp is not pinned, because sites break old
+  # extractors constantly, but its layer would stay cached forever without
+  # a changing arg, and a bot built without it keeps whatever yt-dlp it
+  # was first built with.
   if [ "$name" = "discord" ] || [ "$name" = "telegram" ]; then
-    extra+=(--build-arg "YTDLP_REFRESH=$(date +%s)")
+    extra+=(--build-arg "BOT=$name" --build-arg "YTDLP_REFRESH=$(date +%s)")
   fi
 
   echo

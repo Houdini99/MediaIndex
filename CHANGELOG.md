@@ -15,6 +15,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Both bot images build from one Dockerfile, `bots_common/Dockerfile`,
+  with a `BOT` build argument (`discord` or `telegram`); `./build.sh`
+  passes it. A stack that builds the bot images itself needs
+  `dockerfile: bots_common/Dockerfile` and `args: {BOT: …}` instead of the
+  per-bot Dockerfiles, which are gone. The Discord bot now keeps yt-dlp's
+  and deno's caches under `/tmp/.cache`, like the Telegram bot.
 - Messages on the sign-in pages (a wrong password, "please log in", the
   welcome on the choose-a-password page) look like the rest of the app's,
   with an icon.

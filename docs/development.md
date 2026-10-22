@@ -131,8 +131,10 @@ by git.
 ## Working on the bots
 
 - Both bot images build from the repository root, because they include
-  `bots_common/`. Use `./build.sh discord` or `./build.sh telegram`; by
-  hand that is `docker build -f discord_bot/Dockerfile -t index-discord-bot .`.
+  `bots_common/`, and from one Dockerfile, `bots_common/Dockerfile`, with
+  a `BOT` build argument. Use `./build.sh discord` or `./build.sh telegram`;
+  by hand that is
+  `docker build --build-arg BOT=discord -f bots_common/Dockerfile -t index-discord-bot .`.
 - Code both bots need belongs in `bots_common/`. `tests/test_bots_common.py`
   fails if a bot grows its own copy of the resolver, the parsers, the
   settings readers or the index client.

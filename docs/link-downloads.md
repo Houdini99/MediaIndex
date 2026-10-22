@@ -102,8 +102,8 @@ plugin. With it, most public YouTube videos download without any login.
 
 The plugin in the bot images and the `bgutil` server must have the same
 major version, or YouTube downloads silently go without PO tokens. Both
-are pinned (the server by digest in the compose file, the plugin in each
-bot's `Dockerfile`); update them together. The Discord bot's
+are pinned (the server by digest in the compose file, the plugin in
+`bots_common/Dockerfile`); update them together. The Discord bot's
 startup line says whether PO tokens are on.
 
 `*_YTDLP_POT_PROVIDER` set to an empty value turns this off.

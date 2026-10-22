@@ -162,10 +162,9 @@ Don't rename the stack later: Portainer prefixes the `pg_data` volume with
 the stack name, so a rename leaves the database behind in the old volume.
 
 A *Repository* stack can build the images itself instead. In that case add
-a `build:` section to `web` (`context: .`) and to each bot (`context: .`
-with `dockerfile: discord_bot/Dockerfile` or
-`dockerfile: telegram_bot/Dockerfile`). Every image builds from the
-repository root.
+a `build:` section to `web` (`context: .`) and to each bot (`context: .`,
+`dockerfile: bots_common/Dockerfile`, and `args:` with `BOT: discord` or
+`BOT: telegram`). Every image builds from the repository root.
 
 ## Put it behind the reverse proxy
 

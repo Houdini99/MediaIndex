@@ -18,6 +18,9 @@ docker-compose.yml
 # Internal notes, not part of any image
 cleanup.md
 recommendations.md
+findings.md
+# The bots' build recipe; COPY bots_common would put it in their images
+bots_common/Dockerfile
 # Version control + tests (not needed in the image, bloat the build context)
 .git/
 tests/

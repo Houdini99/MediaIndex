@@ -94,3 +94,19 @@ def test_no_private_copies_came_back():
                 "bots_common/env.py")
         assert ".lower() != 'false'" not in src, (
             f"{bot}/config.py reads a switch by hand — use env.flag()")
+
+
+def test_both_bots_build_from_one_dockerfile():
+    """DENO_VERSION, its checksums and the bgutil pin exist once, and the
+    resolver is installed only by the Dockerfile's refresh layer: a line
+    in requirements.txt would freeze it at the first build's version."""
+    for bot in ('discord_bot', 'telegram_bot'):
+        assert not (REPO / bot / 'Dockerfile').exists(), (
+            f"{bot}/Dockerfile is back — build with bots_common/Dockerfile")
+        packages = [line for line in
+                    (REPO / bot / 'requirements.txt').read_text().splitlines()
+                    if line.strip() and not line.startswith('#')]
+        assert not [p for p in packages if 'yt-dlp' in p or 'bgutil' in p]
+    dockerfile = (REPO / 'bots_common' / 'Dockerfile').read_text()
+    assert dockerfile.count('bgutil-ytdlp-pot-provider==') == 1
+    assert dockerfile.count('ARG DENO_VERSION=') == 1
