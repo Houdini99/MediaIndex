@@ -38,13 +38,10 @@ def insert_staging_row(user_id, fname, size, mtime):
     (user_id, fname) row already exists (ON CONFLICT DO NOTHING never
     aborts the transaction)."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        row = conn.execute(
             "INSERT INTO media.staging (user_id, fname, size, mtime, discovered_at) "
             "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (user_id, fname) DO NOTHING RETURNING id",
-            (user_id, fname, size, mtime, db_now()))
-        row = cur.fetchone()
-        conn.commit()
+            (user_id, fname, size, mtime, db_now())).fetchone()
         return row[0] if row else None
 
 
@@ -53,42 +50,34 @@ def update_staging_size(sid, size, mtime):
     processed file that was overwritten via DAV → back to pending).
     Never touches rows a promote request has claimed."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        conn.execute(
             "UPDATE media.staging SET size=%s, mtime=%s, status='pending', "
             "filehash=NULL, error=NULL WHERE id=%s AND status != 'promoting'",
             (size, mtime, sid))
-        conn.commit()
 
 
 def update_staging_processed(sid, filehash, thumb, ftype, status):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        conn.execute(
             "UPDATE media.staging SET filehash=%s, thumb=%s, ftype=%s, status=%s, "
             "error=NULL WHERE id=%s",
             (filehash, thumb, ftype, status, sid))
-        conn.commit()
 
 
 def set_staging_error(sid, message):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        conn.execute(
             "UPDATE media.staging SET status='error', error=%s WHERE id=%s",
             (message[:500] if message else 'processing failed', sid))
-        conn.commit()
 
 
 def all_rows_for_reconcile():
     """Every staging row as
     (id, user_id, fname, size, mtime, status, thumb, claimed_at)."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT id, user_id, fname, size, mtime, status, thumb, claimed_at "
-            "FROM media.staging")
-        return cur.fetchall()
+            "FROM media.staging").fetchall()
 
 
 # ── Queue queries (ownership-scoped) ───────────────────────────────────────
@@ -125,11 +114,9 @@ def get_staging_row(sid, user_id):
 def count_pending(user_id):
     """Items awaiting user action — everything not currently being promoted."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT COUNT(*) FROM media.staging WHERE user_id=%s AND status != 'promoting'",
-            (user_id,))
-        return cur.fetchone()[0]
+            (user_id,)).fetchone()[0]
 
 
 # ── Promote lifecycle ──────────────────────────────────────────────────────
@@ -137,23 +124,19 @@ def claim_for_promote(sid, user_id):
     """Atomically claim a row for promotion. Only one request can win, and
     the scanner's reconciliation leaves claimed rows alone."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        cur = conn.execute(
             "UPDATE media.staging SET status='promoting', claimed_at=%s "
             "WHERE id=%s AND user_id=%s AND status IN ('ready','duplicate')",
             (db_now(), sid, user_id))
-        conn.commit()
         return cur.rowcount > 0
 
 
 def release_claim(sid, status='ready'):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        conn.execute(
             "UPDATE media.staging SET status=%s, claimed_at=NULL "
             "WHERE id=%s AND status='promoting'",
             (status, sid))
-        conn.commit()
 
 
 def delete_staging_for_user(user_id):
@@ -161,18 +144,13 @@ def delete_staging_for_user(user_id):
     values of the deleted rows so the caller can remove the staged
     thumbnails from disk. Used by admin delete-user."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        rows = conn.execute(
             "DELETE FROM media.staging WHERE user_id=%s RETURNING thumb",
-            (user_id,))
-        thumbs = [r[0] for r in cur.fetchall() if r[0]]
-        conn.commit()
-        return thumbs
+            (user_id,)).fetchall()
+        return [r[0] for r in rows if r[0]]
 
 
 def delete_staging_row(sid):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM media.staging WHERE id=%s", (sid,))
-        conn.commit()
+        cur = conn.execute("DELETE FROM media.staging WHERE id=%s", (sid,))
         return cur.rowcount > 0
