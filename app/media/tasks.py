@@ -24,7 +24,7 @@ import queue
 import threading
 
 from ..config import Config
-from .crypto import decrypt_file, encrypt_file, strip_enc
+from .crypto import encrypt_file, plaintext_copy, strip_enc
 from .db import replace_thumb
 
 _queue = queue.Queue()
@@ -127,14 +127,11 @@ def _render(src_path, thumb_dst, key):
     # non-served scratch dir — never into UPLOAD_FOLDER/THUMB_FOLDER, where a
     # request could reach them before they are cleaned up.
     plain_name = strip_enc(os.path.basename(src_path))
-    scratch = Config.tmp_dir()
-    tmp_src = os.path.join(scratch, f"thumb-src-{plain_name}")
-    tmp_thumb = os.path.join(scratch, f"thumb-out-{plain_name}.png")
+    tmp_thumb = os.path.join(Config.tmp_dir(), f"thumb-out-{plain_name}.png")
     try:
-        decrypt_file(src_path, tmp_src, key)
-        gen_video_thumb(tmp_src, tmp_thumb)
+        with plaintext_copy(src_path, key, f"thumb-src-{plain_name}") as tmp_src:
+            gen_video_thumb(tmp_src, tmp_thumb)
         encrypt_file(tmp_thumb, thumb_dst, key)
     finally:
-        for p in (tmp_src, tmp_thumb):
-            if os.path.exists(p):
-                os.remove(p)
+        if os.path.exists(tmp_thumb):
+            os.remove(tmp_thumb)

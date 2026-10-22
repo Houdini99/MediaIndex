@@ -25,7 +25,7 @@ from PIL import Image
 
 from ..auth.db import get_user_enc_key
 from ..config import Config
-from .crypto import decrypt_file, encrypt_file, strip_enc
+from .crypto import encrypt_file, plaintext_copy, strip_enc
 from .db import get_image_rows, media_path, replace_thumb, thumb_path
 from .dupes_db import forget_hashes
 from .processing import thumbnail_image, versioned_thumb_name
@@ -42,14 +42,9 @@ def _plaintext(src, key, tag):
     if key is None:
         yield src
         return
-    tmp = os.path.join(Config.tmp_dir(),
-                       f"rethumb-{tag}-{strip_enc(os.path.basename(src))}")
-    try:
-        decrypt_file(src, tmp, key)
+    with plaintext_copy(
+            src, key, f"rethumb-{tag}-{strip_enc(os.path.basename(src))}") as tmp:
         yield tmp
-    finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
 
 
 def _orientation(path):

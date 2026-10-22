@@ -9,10 +9,13 @@ On-disk layout: `nonce(16 bytes) || ciphertext`. No auth tag — integrity
 of media bytes is not the goal here (we already trust our own disk); the
 goal is confidentiality of file contents at rest.
 """
+import contextlib
 import os
 from typing import Iterator, Optional
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+from ..config import Config
 
 KEY_BYTES = 32          # AES-256
 NONCE_BYTES = 16        # AES block size; serves as initial counter block
@@ -116,3 +119,23 @@ def decrypt_file(src_path: str, dst_path: str, key: bytes) -> None:
     with open(dst_path, 'wb') as out:
         for chunk in iter_decrypted(src_path, key):
             out.write(chunk)
+
+
+@contextlib.contextmanager
+def plaintext_copy(src_path: str, key: bytes, name: str) -> Iterator[str]:
+    """Decrypt `src_path` to `name` in the non-served scratch dir
+    (Config.tmp_dir()), yield that path, and delete it afterwards, also
+    when the block raises.
+
+    Code that needs a whole private file in plaintext (to render a
+    thumbnail, to re-encrypt it under another key) goes through here, so
+    the plaintext never lands in UPLOAD_FOLDER or THUMB_FOLDER, where a
+    request could reach it before it is cleaned up.
+    """
+    tmp = os.path.join(Config.tmp_dir(), name)
+    try:
+        decrypt_file(src_path, tmp, key)
+        yield tmp
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(tmp)

@@ -3,9 +3,10 @@ import os
 
 import pytest
 
+from app.config import Config
 from app.media.crypto import (
-    new_key, decrypt_file, encrypt_file, iter_decrypted, plaintext_size,
-    NONCE_BYTES, BLOCK_SIZE,
+    new_key, decrypt_file, encrypt_file, iter_decrypted, plaintext_copy,
+    plaintext_size, NONCE_BYTES, BLOCK_SIZE,
 )
 
 
@@ -31,6 +32,23 @@ def test_decrypt_file_writes_the_whole_plaintext(encrypted, tmp_path):
     out.write_bytes(b'stale leftovers from an earlier attempt' * 1000)
     decrypt_file(enc_path, str(out), key)
     assert out.read_bytes() == plaintext
+
+
+def test_plaintext_copy_lives_in_scratch_and_is_always_removed(
+        encrypted, tmp_path, monkeypatch):
+    monkeypatch.setattr(Config, 'UPLOAD_FOLDER', str(tmp_path / 'media'))
+    enc_path, key, plaintext = encrypted
+
+    with plaintext_copy(enc_path, key, 'copy.bin') as path:
+        assert os.path.dirname(path) == Config.tmp_dir()
+        with open(path, 'rb') as f:
+            assert f.read() == plaintext
+    assert not os.path.exists(path)
+
+    with pytest.raises(RuntimeError):
+        with plaintext_copy(enc_path, key, 'copy.bin') as path:
+            raise RuntimeError('render failed')
+    assert not os.path.exists(path)
 
 
 def test_plaintext_size(encrypted):

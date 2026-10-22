@@ -143,14 +143,9 @@ def _reencrypt_file(path, old_key, new_key):
     beside `path` in UPLOAD_FOLDER/THUMB_FOLDER) so this user's plaintext is
     never momentarily reachable through the serving routes.
     """
-    from ..media.crypto import decrypt_file, encrypt_file
-    tmp = os.path.join(Config.tmp_dir(), os.path.basename(path) + '.reenc')
-    try:
-        decrypt_file(path, tmp, old_key)
+    from ..media.crypto import encrypt_file, plaintext_copy
+    with plaintext_copy(path, old_key, os.path.basename(path) + '.reenc') as tmp:
         encrypt_file(tmp, path, new_key)
-    finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
 
 
 def _reassign_user_media(old_uid, new_uid):
