@@ -245,19 +245,6 @@
     /* Private badge sits top-left too — nudge it aside in select mode */
     body.select-mode .type-badge.private { left: 2.4rem; }
 
-    /* ── COUNT BAR ───────────────────────────────────────────────────────── */
-    .count-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 1rem;
-    }
-    .count-label {
-        font-size: .8rem;
-        color: var(--muted);
-        letter-spacing: -.01em;
-    }
-
     /* ── GALLERY ─────────────────────────────────────────────────────────── */
     .gallery {
         display: grid;

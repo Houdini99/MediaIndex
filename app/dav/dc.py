@@ -24,9 +24,6 @@ ENVIRON_USER_ID = 'mediaindex.user_id'
 
 
 class MediaIndexDomainController(BaseDomainController):
-    def __init__(self, wsgidav_app, config):
-        super().__init__(wsgidav_app, config)
-
     def get_domain_realm(self, path_info, environ):
         return "MediaIndex WebDAV"
 

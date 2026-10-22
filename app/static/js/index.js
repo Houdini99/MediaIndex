@@ -24,18 +24,9 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
 
         const esc = MI.esc;   // shared helper (static/js/common.js)
 
-        function getType(tags) {
-            if (!tags) return '';
-            const t = tags.split(',').map(x => x.trim());
-            if (t.includes('video')) return 'video';
-            if (t.includes('gif'))   return 'gif';
-            if (t.includes('image'))  return 'image';
-            return '';
-        }
-
         function createCard(media) {
             const id   = media.id;
-            const type = media.type || getType(media.tags);
+            const type = media.type;
             const div  = document.createElement('div');
             div.className = 'gallery-item';
             div.dataset.id = id;

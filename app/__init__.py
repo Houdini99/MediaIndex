@@ -14,8 +14,6 @@ def create_app():
     app = Flask(__name__, static_folder='static', template_folder='templates')
 
     app.config.from_object(Config)
-    app.secret_key = Config.SECRET_KEY
-    app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
 
     # ── Ensure upload/thumb/data/staging directories exist ─────────────────
     for folder in (Config.UPLOAD_FOLDER, Config.THUMB_FOLDER, Config.DATA_DIR,

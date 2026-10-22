@@ -319,8 +319,6 @@ def ftype_backfill_sql():
     first, and the `.enc` suffix is stripped first so a private file is
     classified by its real extension.
     """
-    from app.config import Config
-
     def _match(exts):
         alts = '|'.join(sorted(e.lower() for e in exts))
         return f"base ~ '\\.({alts})$'"

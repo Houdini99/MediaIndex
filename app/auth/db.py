@@ -130,7 +130,6 @@ def get_or_create_user_enc_key(user_id):
 # dictionary-attacked, and DAV clients authenticate on every request, so
 # verification must be cheap (a slow KDF here would throttle all DAV I/O).
 def hash_dav_password(password):
-    import hashlib
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 

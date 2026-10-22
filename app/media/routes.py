@@ -144,11 +144,7 @@ def upload():
     if request.method == 'POST':
         files = request.files.getlist('files')
         results = {'uploaded': [], 'duplicates': [], 'errors': []}
-        uid = g.user['id'] if g.user else None
-        if not uid:
-            flash("❌ Error: not logged in.", "danger")
-            return redirect(url_for('media.upload'))
-        uid = _owner_uid(uid, g.user['username'],
+        uid = _owner_uid(g.user['id'], g.user['username'],
                          request.form.get('uploaded_for'))
         for i, f in enumerate(files):
             fn = f.filename or '(unnamed)'

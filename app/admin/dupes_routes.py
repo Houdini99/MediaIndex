@@ -73,8 +73,6 @@ def duplicates():
         quarantine_size=human_size(q_bytes or 0),
         dismissed=fetch_dismissed_detail(),
         errors=dupes.hash_errors(),
-        sources=dupes.SOURCES,
-        algos=dupes.ALGOS,
         types=dupes.TYPES,
         frame_choices=dupes.VIDEO_FRAME_CHOICES,
         max_threshold=dupes.MAX_THRESHOLD,

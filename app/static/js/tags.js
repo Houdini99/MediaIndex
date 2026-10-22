@@ -7,7 +7,6 @@ const MEDIA_INDEX = {
     removeTagUrl: document.body.dataset.removeTagUrl || '',
 };
 
-let visibleCount = MEDIA_INDEX.totalTags;
   const totalCount = MEDIA_INDEX.totalTags;
 
   function filterTags() {

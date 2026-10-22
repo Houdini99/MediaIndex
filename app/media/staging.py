@@ -65,7 +65,6 @@ def _loop():
 def _is_junk(name):
     return (
         name.startswith('.')
-        or name.startswith('._')
         or name in _JUNK_NAMES
         or name.lower().endswith(_JUNK_SUFFIXES)
     )

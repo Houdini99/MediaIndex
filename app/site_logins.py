@@ -25,7 +25,6 @@ Three rules shape this module:
     it downloaded with, so it can never land on top of an upload, or bring
     back a login an admin removed, while its download was running.
 """
-import hashlib
 import os
 import time
 from dataclasses import dataclass
@@ -241,11 +240,6 @@ class Login:
     @property
     def readable(self):
         return self.text is not None
-
-    @property
-    def fingerprint(self):
-        """Short, stable tag for a log line — never the cookies themselves."""
-        return hashlib.sha256((self.text or '').encode()).hexdigest()[:8]
 
 
 _SELECT = """
