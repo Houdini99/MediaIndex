@@ -16,6 +16,8 @@ round-trip through to_signed/to_unsigned at the boundary.
 """
 import logging
 
+from psycopg.rows import namedtuple_row
+
 from ..db_utils import db_conn, db_now, ensure_pg_schema
 
 _log = logging.getLogger(__name__)
@@ -118,14 +120,23 @@ def forget_hashes(media_ids):
 
 # ── Hash index: reads ──────────────────────────────────────────────────────
 def fetch_public_media():
-    """(id, filepath, thumb, uploaded_by, upload_date, tags) for every
-    public media row — the candidate set for a scan."""
+    """(id, filepath, thumb, uploaded_by, upload_date, tags, ftype) for
+    every public media row — the candidate set for a scan. Named tuples, so
+    the type reads as `row.ftype`."""
     with _conn() as conn:
-        cur = conn.cursor()
+        cur = conn.cursor(row_factory=namedtuple_row)
         cur.execute(
-            "SELECT id, filepath, thumb, uploaded_by, upload_date, tags "
+            "SELECT id, filepath, thumb, uploaded_by, upload_date, tags, ftype "
             "FROM media.media WHERE NOT is_private ORDER BY id")
         return cur.fetchall()
+
+
+def count_public_media_by_type():
+    """{ftype: count} over the public media rows."""
+    with _conn() as conn:
+        return dict(conn.execute(
+            "SELECT ftype, count(*) FROM media.media WHERE NOT is_private "
+            "GROUP BY ftype").fetchall())
 
 
 def fetch_hashed_ids(source, algo_ver):

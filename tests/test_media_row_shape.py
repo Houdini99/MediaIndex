@@ -15,7 +15,7 @@ from app.media.db import (
 )
 
 EXPECTED = {'id', 'filepath', 'thumb', 'tags', 'filehash', 'uploaded_by',
-            'upload_date', 'is_private'}
+            'upload_date', 'is_private', 'ftype'}
 
 
 def _seed(app):

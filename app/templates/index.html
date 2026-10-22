@@ -76,10 +76,6 @@
 
   <div class="gallery">
     {% for media in media %}
-      {%- set raw = media.filepath -%}
-      {%- set base = raw[:-4] if raw.endswith('.enc') else raw -%}
-      {%- set ext = base.rsplit('.',1)[-1].lower() -%}
-      {%- set mtype = 'video' if ext in ['mp4','webm','avi','mov','mkv'] else ('gif' if ext == 'gif' else 'image') -%}
       <div class="gallery-item" data-id="{{ media.id }}">
         <div class="action-buttons">
           <button class="action-btn edit-btn"   data-action="edit" data-id="{{ media.id }}" data-stop title="Edit tags">✎</button>
@@ -91,7 +87,7 @@
                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                alt=""/>
           <div class="thumb-overlay"></div>
-          <span class="type-badge {{ mtype }}">{{ mtype }}</span>
+          <span class="type-badge {{ media.ftype }}">{{ media.ftype }}</span>
           {% if media.is_private %}
             <span class="type-badge private" title="Only visible to you">private</span>
           {% endif %}

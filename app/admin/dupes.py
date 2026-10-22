@@ -49,7 +49,6 @@ from ..media.phash import (
     seq_distance,
     similarity_pct,
 )
-from ..media.processing import file_type
 from ..media.tagging import tag_list, tag_str
 
 # Tags applied to a quarantined item so it is also findable in the gallery.
@@ -126,12 +125,6 @@ def normalize_params(raw):
 
 
 # ── The scan ───────────────────────────────────────────────────────────────
-def _row_type(filepath):
-    """image | gif | video for a stored filepath (never '.enc' here — the
-    scan only ever sees public rows)."""
-    return file_type(os.path.basename(filepath or ''))
-
-
 class ScanCancelled(Exception):
     """Raised inside a long item when the admin cancels the scan."""
 
@@ -161,8 +154,7 @@ def _fingerprint(row, params, keepalive=None):
     the configured source — the 150px thumbnail (fast, always present) or
     the full-resolution original (slower, more precise on subtle crops).
     """
-    filepath, thumb = row[1], row[2]
-    ftype = _row_type(filepath)
+    filepath, thumb, ftype = row.filepath, row.thumb, row.ftype
 
     if ftype == 'video':
         path = media_path(filepath)
@@ -220,7 +212,7 @@ def start_scan(params, user_id):
 
     candidates = [
         row for row in dupes_db.fetch_public_media()
-        if _row_type(row[1]) in params['types']
+        if row.ftype in params['types']
     ]
     job_id = dupes_db.claim_job(json.dumps(params), len(candidates), user_id)
     if job_id is None:
@@ -283,7 +275,7 @@ def _scan_worker(job_id, params, candidates):
                     _log.warning("dupes: fingerprint failed for media %s: %s",
                                  mid, exc)
                     dupes_db.store_hash_error(
-                        mid, params['source'], ALGO_VER, _row_type(filepath),
+                        mid, params['source'], ALGO_VER, row.ftype,
                         f"{type(exc).__name__}: {exc}")
                     failed += 1
 
@@ -611,7 +603,7 @@ def _compute_groups(params, dismissed, quarantined):
 
 def _item(mid, meta, media_rows, usernames):
     source, frames, width, height, bytes_, ftype, hashed_at = meta[mid]
-    _id, filepath, thumb, uploaded_by, upload_date, tags = media_rows[mid]
+    _id, filepath, thumb, uploaded_by, upload_date, tags, _ftype = media_rows[mid]
     return {
         'id': mid,
         'filepath': os.path.basename(filepath or ''),
@@ -773,9 +765,5 @@ def hash_errors():
 def library_scale():
     """Rough item counts per type, so the scan form can warn about how long
     a video pass will take before it is started."""
-    counts = {t: 0 for t in TYPES}
-    for row in dupes_db.fetch_public_media():
-        ftype = _row_type(row[1])
-        if ftype in counts:
-            counts[ftype] += 1
-    return counts
+    stored = dupes_db.count_public_media_by_type()
+    return {t: stored.get(t, 0) for t in TYPES}

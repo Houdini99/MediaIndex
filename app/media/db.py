@@ -28,7 +28,7 @@ from .tagging import tag_list, tag_str
 #: Explicit column list for every media read, so callers see a stable set of
 #: names regardless of the table's physical column order.
 MEDIA_COLUMNS = ('id, filepath, thumb, tags, filehash, uploaded_by, '
-                 'upload_date, is_private')
+                 'upload_date, is_private, ftype')
 
 
 def _conn():

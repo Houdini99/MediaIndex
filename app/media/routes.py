@@ -31,7 +31,7 @@ from .db import (
     update_media_tags,
     bulk_edit_tags,
 )
-from .processing import allowed_file, file_type, save_stream_hashed
+from .processing import allowed_file, save_stream_hashed
 from .tagging import tag_list
 from .crypto import ENC_SUFFIX, iter_decrypted, plaintext_size, strip_enc
 from .ingest import ingest_file, set_media_privacy
@@ -417,7 +417,7 @@ def media_meta(media_id):
             'thumb': url_for('media.serve_thumb',
                              fname=os.path.basename(m['thumb'])),
             'tags': m['tags'],
-            'type': file_type(orig_name),
+            'type': m['ftype'],
             'uploaded_by': get_username_by_id(m['uploaded_by']) or 'Unknown',
             # timestamptz comes back as datetime; keep the ISO string the
             # API always served (jsonify would render RFC-822 instead).
@@ -448,7 +448,7 @@ def api_media():
             'id': m['id'],
             'thumb': os.path.basename(m['thumb']),
             'tags': m['tags'] or '',
-            'type': file_type(strip_enc(m['filepath'])),
+            'type': m['ftype'],
             'is_private': bool(m['is_private']),
         }
         for m in media
@@ -521,7 +521,7 @@ def api_feed():
             'download_name': strip_enc(os.path.basename(m['filepath'])),
             'thumb': os.path.basename(m['thumb']),
             'tags': m['tags'] or '',
-            'type': file_type(strip_enc(m['filepath'])),
+            'type': m['ftype'],
             'uploaded_by': umap.get(m['uploaded_by'], 'Unknown'),
             'is_private': bool(m['is_private']),
             'can_delete': is_admin or m['uploaded_by'] == g.user['id'],
