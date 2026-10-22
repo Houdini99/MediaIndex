@@ -24,6 +24,8 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
 
         const esc = MI.esc;   // shared helper (static/js/common.js)
 
+        /* Same markup as the server-rendered card in templates/index.html
+         * (the first page): change both. */
         function createCard(media) {
             const id   = media.id;
             const type = media.type;
@@ -32,11 +34,11 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
             div.dataset.id = id;
             div.innerHTML =
                 `<div class="action-buttons">
-                   <button class="action-btn edit-btn" data-action="edit" data-id="${id}" data-stop title="Edit Tags">✎</button>
+                   <button class="action-btn edit-btn" data-action="edit" data-id="${id}" data-stop title="Edit tags">✎</button>
                    <button class="action-btn delete-btn" data-action="delete" data-id="${id}" data-stop title="Delete File">×</button>
                  </div>
                  <div class="thumb-wrapper">
-                   <img class="thumb" data-action="open" data-id="${id}"
+                   <img class="thumb" loading="lazy" data-action="open" data-id="${id}"
                         data-src="/thumbs/${esc(media.thumb)}"
                         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                         alt=""/>
@@ -50,8 +52,8 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
                  <div id="edit-form-${id}" class="edit-form">
                    <input type="text" id="edit-input-${id}" value="${esc(media.tags||'')}" placeholder="Tags separated by commas…" data-tag-ac>
                    <div class="edit-form-btns">
-                     <button class="cancel-btn" data-action="edit-cancel" data-id="${id}">Cancel</button>
-                     <button class="save-btn" data-action="edit-save" data-id="${id}">Save</button>
+                     <button type="button" class="cancel-btn" data-action="edit-cancel" data-id="${id}">Cancel</button>
+                     <button type="button" class="save-btn" data-action="edit-save" data-id="${id}">Save</button>
                    </div>
                  </div>`;
             return div;
@@ -100,14 +102,13 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
     function openModal(id) {
         fetch('/mediadata/' + id).then(r => r.json()).then(d => {
             const modal    = document.getElementById('modal-bg');
-            const filename = d.filepath.split('/').pop();
             const isVideo  = d.type === 'video';
             const container = modal.querySelector('.modal-view-content');
-            zoomOut();            // clear any zoom left over from the last image
+            zoom.out();           // clear any zoom left over from the last image
             container.innerHTML = '';
             const el = document.createElement(isVideo ? 'video' : 'img');
             el.className = 'modal-media';
-            el.src = '/media/' + filename;
+            el.src = d.filepath;          // already the /media/<name> URL
             if (isVideo) {
                 el.controls = true;
             } else {
@@ -126,10 +127,9 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
                 : NO_TAGS;
 
             const dl = document.getElementById('modal-download');
-            const dlName = d.download_name || filename;
-            dl.href = '/media/' + filename;
-            dl.setAttribute('download', dlName);
-            dl.textContent = '↓ ' + dlName;
+            dl.href = d.filepath;
+            dl.setAttribute('download', d.download_name);
+            dl.textContent = '↓ ' + d.download_name;
 
             modal.dataset.currentId = id;
             modal.classList.add('active');
@@ -140,7 +140,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
 
     function closeModal() {
         stopSlideshow();
-        zoomOut();
+        zoom.out();
         const modal = document.getElementById('modal-bg');
         modal.classList.remove('active');
         // Stop video playback
@@ -163,19 +163,8 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
      * would show backdrop down the image's sides. Pinning it only while
      * zoomed leaves the normal layout exactly as it was.
      */
-    const ZOOM_DEFAULT = 2.5;
-    const ZOOM_MIN     = 1.5;
-    const ZOOM_MAX     = 5;
-    const ZOOM_STEP    = .5;
-    let zoomScale = 0;                    // 0 = not zoomed
-
     function zoomViewport() {
         return document.querySelector('#modal-bg .modal-view-content');
-    }
-
-    function zoomImage() {
-        const vp = zoomViewport();
-        return vp ? vp.querySelector('img.modal-media') : null;
     }
 
     /* The cursor as a percentage of the image box. Measured on the viewport,
@@ -188,47 +177,33 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
             pct(ev.clientY - r.top,  r.height) + '%';
     }
 
-    function zoomIn(ev, img) {
-        const vp = img.parentElement;
-        const r  = img.getBoundingClientRect();   // still the untransformed box
-        vp.style.width  = r.width + 'px';
-        vp.style.height = r.height + 'px';
-        vp.classList.add('zoom-viewport');
-        img.classList.add('zoomed');
-        document.getElementById('modal-bg').classList.add('zoom-active');
-        // An image that slides away five seconds into a close look is useless.
-        stopSlideshow();
-        zoomScale = ZOOM_DEFAULT;
-        setZoomOrigin(ev, img);
-        img.style.transform = 'scale(' + zoomScale + ')';
-    }
-
-    /* Safe to call unconditionally — openModal and closeModal both do. */
-    function zoomOut() {
-        zoomScale = 0;
-        const vp = zoomViewport();
-        if (vp) {
-            vp.classList.remove('zoom-viewport');
-            vp.style.width  = '';
-            vp.style.height = '';
-            const img = vp.querySelector('img.modal-media');
-            if (img) {
-                img.classList.remove('zoomed');
-                img.style.transform = '';
-                img.style.transformOrigin = '';
+    /* zoom.out() is safe to call unconditionally — openModal and
+     * closeModal both do. */
+    const zoom = MI.zoom({
+        origin: setZoomOrigin,
+        enter(img) {
+            const vp = img.parentElement;
+            const r  = img.getBoundingClientRect();   // still the untransformed box
+            vp.style.width  = r.width + 'px';
+            vp.style.height = r.height + 'px';
+            vp.classList.add('zoom-viewport');
+            img.classList.add('zoomed');
+            document.getElementById('modal-bg').classList.add('zoom-active');
+            // An image that slides away five seconds into a close look is useless.
+            stopSlideshow();
+        },
+        leave(img) {
+            if (img) img.classList.remove('zoomed');
+            const vp = zoomViewport();
+            if (vp) {
+                vp.classList.remove('zoom-viewport');
+                vp.style.width  = '';
+                vp.style.height = '';
             }
-        }
-        const bg = document.getElementById('modal-bg');
-        if (bg) bg.classList.remove('zoom-active');
-    }
-
-    function zoomBy(step, ev, img) {
-        const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomScale + step));
-        if (next === zoomScale) return;
-        zoomScale = next;
-        setZoomOrigin(ev, img);
-        img.style.transform = 'scale(' + zoomScale + ')';
-    }
+            const bg = document.getElementById('modal-bg');
+            if (bg) bg.classList.remove('zoom-active');
+        },
+    });
 
     /* ── Lightbox navigation ── */
     function galleryIds() {
@@ -319,10 +294,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
 
     function modalDelete() {
         const id = document.getElementById('modal-bg').dataset.currentId;
-        if (!id || !confirm('Are you sure you want to delete this file?')) return;
-        MI.post(`/delete/${id}`)
-            .then(r => { if (r.ok) location.reload(); else alert('Error deleting file.'); })
-            .catch(() => alert('Error deleting file.'));
+        if (id) deleteMedia(id);
     }
 
     /* ── Bulk select / delete ── */
@@ -456,7 +428,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
-            if (zoomScale) zoomOut();
+            if (zoom.scale) zoom.out();
             else if (document.getElementById('modal-bg').classList.contains('active')) closeModal();
             else if (bulkTagMode) closeBulkTagEditor();
             else if (selectMode) toggleSelectMode();
@@ -517,7 +489,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
     MI.on('modal-close', () => closeModal());
     MI.on('modal-prev',  () => modalNav(-1));
     MI.on('modal-next',  () => modalNav(1));
-    MI.on('zoom',        (el, ev) => zoomScale ? zoomOut() : zoomIn(ev, el));
+    MI.on('zoom',        (el, ev) => zoom.scale ? zoom.out() : zoom.in(ev, el));
 
     // Backdrop click closes the lightbox. The target check is what the
     // old markup achieved with a stopPropagation() handler on .modal-box:
@@ -532,21 +504,15 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         // no-ops until a click has actually zoomed in.
         const vp = zoomViewport();
         if (!vp) return;
-        vp.addEventListener('pointermove', e => {
-            if (!zoomScale) return;
-            const img = zoomImage();
-            if (img) setZoomOrigin(e, img);
-        });
+        vp.addEventListener('pointermove', e => zoom.move(e));
         // passive:false — .modal-body scrolls, and the wheel is ours while zoomed.
         vp.addEventListener('wheel', e => {
-            if (!zoomScale) return;
-            const img = zoomImage();
-            if (!img) return;
+            if (!zoom.scale) return;
             e.preventDefault();
-            zoomBy(e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP, e, img);
+            zoom.wheel(e);
         }, { passive: false });
         // A resize re-letterboxes the image, leaving the pinned clip box the
         // wrong size for it. Dropping out of the zoom is the honest answer —
         // the next click re-measures.
-        window.addEventListener('resize', () => { if (zoomScale) zoomOut(); });
+        window.addEventListener('resize', () => { if (zoom.scale) zoom.out(); });
     });

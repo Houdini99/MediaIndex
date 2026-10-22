@@ -75,6 +75,8 @@
   </div>
 
   <div class="gallery">
+    {# Same markup as createCard() in static/js/index.js, which builds the
+       cards loaded while scrolling: change both. #}
     {% for media in media %}
       <div class="gallery-item" data-id="{{ media.id }}">
         <div class="action-buttons">
@@ -99,7 +101,7 @@
                 <span class="tag-pill {% if tag.strip().startswith('user:') %}user-tag{% elif tag.strip() in ['image','gif','video'] %}type-tag{% endif %}">{{ tag.strip() }}</span>
               {% endif %}{% endfor %}
             {% else %}
-              <span class="no-tags">No Tags</span>
+              <span class="no-tags">No tags</span>
             {% endif %}
           </div>
         </div>

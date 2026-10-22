@@ -95,6 +95,57 @@ MI.tagPills = function (tagsStr, emptyHtml) {
     }).join('');
 };
 
+/* ── Click-to-zoom ──────────────────────────────────────────────────────
+ * The gallery lightbox and the feed share the gesture: click an image to
+ * magnify it about the cursor, wheel to step the level, click again (or
+ * Escape) to leave. Their geometry differs, so each passes three hooks:
+ *   origin(ev, img)  set img.style.transformOrigin for the pointer
+ *   enter(img)       runs before the first scale (clip box, classes, pausing)
+ *   leave(img, was)  runs after the transform is cleared; img is null and
+ *                    `was` 0 when nothing was zoomed
+ * The returned object's `scale` is 0 when not zoomed; out() is safe to
+ * call at any time.
+ */
+MI.zoom = function (hooks) {
+    const DEFAULT = 2.5, MIN = 1.5, MAX = 5, STEP = .5;
+    let scale = 0, el = null;
+    function apply(ev) {
+        hooks.origin(ev, el);
+        el.style.transform = 'scale(' + scale + ')';
+    }
+    return {
+        get scale() { return scale; },
+        get el() { return el; },
+        in: function (ev, img) {
+            el = img;
+            hooks.enter(img);
+            scale = DEFAULT;
+            apply(ev);
+        },
+        out: function () {
+            const img = el, was = scale;
+            el = null;
+            scale = 0;
+            if (img) {
+                img.style.transform = '';
+                img.style.transformOrigin = '';
+            }
+            hooks.leave(img, was);
+        },
+        /* One wheel notch while zoomed: up magnifies, down shrinks. */
+        wheel: function (ev) {
+            const next = Math.max(MIN, Math.min(MAX, scale + (ev.deltaY < 0 ? STEP : -STEP)));
+            if (next === scale) return;
+            scale = next;
+            apply(ev);
+        },
+        /* Pointer movement pans: the origin follows the cursor. */
+        move: function (ev) {
+            if (scale && el) hooks.origin(ev, el);
+        },
+    };
+};
+
 /* ── data-action: delegated click dispatch ──────────────────────────────
  * Markup:  <button data-action="delete" data-id="12" data-stop>×</button>
  * Script:  MI.on('delete', (el, ev) => deleteMedia(+el.dataset.id));

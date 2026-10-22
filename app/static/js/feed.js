@@ -416,7 +416,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!settingsPanel.hidden) closeSettings();
-    else if (feedZoomScale) feedZoomOut();
+    else if (feedZoom.scale) feedZoom.out();
     else if (fullscreen) setFullscreen(false);
 });
 
@@ -653,7 +653,7 @@ function removeSlide(slide) {
 }
 
 function clearAllSlides() {
-    feedZoomOut();             // the zoomed element is about to be discarded
+    feedZoom.out();            // the zoomed element is about to be discarded
     slides.forEach(forgetSlide);
     slides = [];
     clearSlideshowSchedule();
@@ -1042,22 +1042,14 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Zoom ─────────────────────────────────────────────────────────────────
-// The same gesture as the gallery lightbox — click an image to magnify it
-// about the cursor, wheel to step the level, click or Escape to leave — but
-// its own implementation, because the geometry here is nothing like the
-// lightbox's. `.feed-media` is an inset:0 layer with object-fit:contain, so
+// The same gesture as the gallery lightbox (MI.zoom in common.js), with its
+// own geometry, because the geometry here is nothing like the lightbox's. `.feed-media` is an inset:0 layer with object-fit:contain, so
 // the element box is the whole slide and the picture sits letterboxed inside
 // it. Two things follow: `.feed-slide` is already overflow:hidden and crops
 // the scaled image with no clip box of its own, and the cursor has to be
 // clamped to the *picture* rather than the element, or pointing at a
 // letterbox bar would zoom into black and leave the image's own edges
 // unreachable.
-const FEED_ZOOM_DEFAULT = 2.5;
-const FEED_ZOOM_MIN     = 1.5;
-const FEED_ZOOM_MAX     = 5;
-const FEED_ZOOM_STEP    = .5;
-let feedZoomEl = null;            // the <img> currently zoomed, or null
-let feedZoomScale = 0;            // 0 = not zoomed
 let feedZoomScrollTop = 0;        // where the feed was when the zoom started
 
 /* Where object-fit: contain actually paints the picture, and the element box
@@ -1089,54 +1081,38 @@ function setFeedZoomOrigin(ev, img) {
         ((y - box.top)  / box.height * 100) + '%';
 }
 
-function feedZoomIn(ev, img) {
-    feedZoomEl = img;
-    feedZoomScale = FEED_ZOOM_DEFAULT;
-    feedZoomScrollTop = container.scrollTop;
-    img.classList.add('is-zoomed');
-    // Hold the auto-advance without touching the saved setting: a slide that
-    // scrolls away mid-inspection defeats the point, but the user never asked
-    // for the slideshow to be switched off.
-    clearSlideshowSchedule();
-    setFeedZoomOrigin(ev, img);
-    img.style.transform = 'scale(' + feedZoomScale + ')';
-}
+/* feedZoom.out() is safe to call unconditionally. */
+const feedZoom = MI.zoom({
+    origin: setFeedZoomOrigin,
+    enter(img) {
+        feedZoomScrollTop = container.scrollTop;
+        img.classList.add('is-zoomed');
+        // Hold the auto-advance without touching the saved setting: a slide
+        // that scrolls away mid-inspection defeats the point, but the user
+        // never asked for the slideshow to be switched off.
+        clearSlideshowSchedule();
+    },
+    leave(img, was) {
+        if (img) img.classList.remove('is-zoomed');
+        // Hand the slideshow back the schedule zooming in took away.
+        if (was && settings.slideshow) scheduleSlideshow(currentSlide || getCurrentSlide());
+    },
+});
 
-/* Safe to call unconditionally. */
-function feedZoomOut() {
-    if (feedZoomEl) {
-        feedZoomEl.classList.remove('is-zoomed');
-        feedZoomEl.style.transform = '';
-        feedZoomEl.style.transformOrigin = '';
-        feedZoomEl = null;
-    }
-    if (!feedZoomScale) return;
-    feedZoomScale = 0;
-    // Hand the slideshow back the schedule zooming in took away.
-    if (settings.slideshow) scheduleSlideshow(currentSlide || getCurrentSlide());
-}
-
-MI.on('feed-zoom', (el, ev) => feedZoomScale ? feedZoomOut() : feedZoomIn(ev, el));
+MI.on('feed-zoom', (el, ev) => feedZoom.scale ? feedZoom.out() : feedZoom.in(ev, el));
 
 // Bound to the container, which outlives every slide in it. Reading the
 // pointer off the event rather than its target means the badges and buttons
 // layered over the image don't interrupt the pan.
-container.addEventListener('pointermove', (e) => {
-    if (feedZoomScale && feedZoomEl) setFeedZoomOrigin(e, feedZoomEl);
-});
+container.addEventListener('pointermove', (e) => feedZoom.move(e));
 
 container.addEventListener('wheel', (e) => {
-    if (!feedZoomScale) return;
+    if (!feedZoom.scale) return;
     // A rebuild (settings applied, feed reloaded) can take the element out
     // from under the zoom; without this the feed would refuse to scroll.
-    if (!feedZoomEl || !feedZoomEl.isConnected) { feedZoomOut(); return; }
+    if (!feedZoom.el.isConnected) { feedZoom.out(); return; }
     e.preventDefault();                    // the wheel is the zoom's while zoomed
-    const next = Math.max(FEED_ZOOM_MIN, Math.min(FEED_ZOOM_MAX,
-        feedZoomScale + (e.deltaY < 0 ? FEED_ZOOM_STEP : -FEED_ZOOM_STEP)));
-    if (next === feedZoomScale) return;
-    feedZoomScale = next;
-    setFeedZoomOrigin(e, feedZoomEl);
-    feedZoomEl.style.transform = 'scale(' + feedZoomScale + ')';
+    feedZoom.wheel(e);
 }, { passive: false });
 
 // A real scroll — a keyboard nav, a swipe, a slideshow advance — carries the
@@ -1146,6 +1122,6 @@ container.addEventListener('wheel', (e) => {
 // impossible to hold while the feed was still coming to rest.
 const FEED_ZOOM_SCROLL_SLACK = 40;   // px; a navigation is a whole slide
 container.addEventListener('scroll', () => {
-    if (!feedZoomScale) return;
-    if (Math.abs(container.scrollTop - feedZoomScrollTop) > FEED_ZOOM_SCROLL_SLACK) feedZoomOut();
+    if (!feedZoom.scale) return;
+    if (Math.abs(container.scrollTop - feedZoomScrollTop) > FEED_ZOOM_SCROLL_SLACK) feedZoom.out();
 }, { passive: true });

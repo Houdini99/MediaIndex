@@ -83,8 +83,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file-extension helpers, and the upload event carries the item's stored
   type, which the Discord announcement now reads instead of guessing it
   from the file name; the link resolver's download step handles its
-  first try and its impersonated retry in one loop; the database
-  modules lost their
+  first try and its impersonated retry in one loop; the gallery lightbox
+  and the feed share one click-to-zoom (`MI.zoom` in `common.js`), the
+  lightbox deletes through the card's delete and uses the media URL the
+  server sends, and the gallery's two card builders (the first page's
+  template and the cards loaded while scrolling) match again, down to
+  "No tags" and "Edit tags"; the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.
