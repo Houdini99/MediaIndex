@@ -30,7 +30,7 @@ import uuid
 import aiohttp
 import discord
 
-from bots_common import resolver, site_logins, sniff
+from bots_common import env, resolver, site_logins, sniff
 from bots_common.download import TooLarge
 from bots_common.index_client import AuthError, IndexUnavailable
 
@@ -711,45 +711,11 @@ class IndexBot(discord.Client):
             verdict = await self._probe(url, login, message)
             if verdict is not None:
                 return verdict          # not media, or a playlist
-        try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(resolver.resolve, url,
-                                  tempfile.gettempdir(),
-                                  config.YTDLP_MAX_BYTES,
-                                  login.path,
-                                  config.YTDLP_STALL_TIMEOUT,
-                                  quality=config.YTDLP_QUALITY,
-                                  pot_provider=config.YTDLP_POT_PROVIDER),
-                timeout=config.YTDLP_MAX_DURATION)
-        except asyncio.TimeoutError:
-            # The stall watchdog handles a frozen download; this only trips
-            # when a resolve hangs before the download stage (extraction).
-            logging.warning("resolver: exceeded the %gs hard ceiling for %s",
-                            config.YTDLP_MAX_DURATION, url)
-            reason = (f"resolve hung past the {config.YTDLP_MAX_DURATION:g}s "
-                      f"ceiling before downloading")
-            await self._report(message, f"❌ <{url}> — {reason}")
-            return _Outcome(ERROR, True, reason)
-        except resolver.ResolveError as e:
-            # Typed, specific reason (stalled, over cap, blocked, no video,
-            # login required, download failed) — surface it verbatim in the
-            # log channel, with what an admin can do about a login.
-            reason = e.reason + login.hint(e)
-            logging.warning("resolver: %s — %s", url, reason)
-            await self._report(message, f"{e.emoji} <{url}> — {reason}")
-            return _Outcome(e.emoji, e.retryable, reason)
-        except Exception as e:
-            logging.exception("resolver: unexpected failure for %s", url)
-            await self._report(
-                message, f"❌ <{url}> — unexpected error: "
-                f"{type(e).__name__} (see container log)")
-            return _Outcome(ERROR)
-        if res is None:
-            # Only reached if the resolver is disabled (guarded upstream).
-            await self._report(
-                message, f"🚫 <{url}> — link resolver is unavailable")
-            return _Outcome(UNSUPPORTED)
-        login.used = res.used_cookies
+        res = await resolver.resolve_async(
+            url, login, env.YtdlpSettings.from_config(config))
+        if isinstance(res, resolver.Failure):
+            await self._report(message, f"{res.emoji} <{url}> — {res.reason}")
+            return _Outcome(res.emoji, res.retryable, res.reason)
         return res
 
     async def _probe(self, url, login, message):

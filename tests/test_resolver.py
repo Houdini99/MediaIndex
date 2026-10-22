@@ -4,6 +4,8 @@ a human reason; the resolver never lets a raw yt-dlp error escape), and
 filename/site derivation. yt-dlp itself is faked for the download paths so
 the tests run offline; the matching tests use the real extractor list when
 the library is installed."""
+import asyncio
+import dataclasses
 import logging
 import os
 import time
@@ -11,7 +13,7 @@ import types
 
 import pytest
 
-from bots_common import resolver
+from bots_common import env, resolver
 
 
 @pytest.fixture
@@ -771,3 +773,95 @@ def test_probe_reports_an_unreadable_page_as_a_verdict(monkeypatch):
 
 def test_probe_without_ytdlp_is_none(no_ytdlp):
     assert resolver.probe('u') is None
+
+
+# ── resolve_async() ────────────────────────────────────────────────────────
+SETTINGS = env.YtdlpSettings(
+    enabled=True, max_bytes=10**6, stall_timeout=5.0, max_duration=30.0,
+    cookies='', quality='720', pot_provider='http://bgutil:4416')
+
+
+class _Login:
+    """Stands in for site_logins.LoginRun."""
+
+    def __init__(self, path=None, hint=''):
+        self.path = path
+        self.used = False
+        self._hint = hint
+
+    def hint(self, error):
+        return self._hint
+
+
+def _resolving(monkeypatch, outcome):
+    """resolve() replaced by one that returns `outcome`, or raises it.
+    Returns the list of the arguments it was called with."""
+    calls = []
+
+    def fake(url, tmpdir, max_bytes, cookies=None, stall_timeout=None, **kw):
+        calls.append(dict(url=url, tmpdir=tmpdir, max_bytes=max_bytes,
+                          cookies=cookies, stall_timeout=stall_timeout, **kw))
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(resolver, 'resolve', fake)
+    return calls
+
+
+def test_resolve_async_resolves_with_the_login_and_the_settings(tmp_path,
+                                                                monkeypatch):
+    done = resolver.Resolved('/x/Clip.mp4', 'Clip.mp4', 'youtube',
+                             used_cookies=True)
+    calls = _resolving(monkeypatch, done)
+    login = _Login('/x/cookies.txt')
+    res = asyncio.run(resolver.resolve_async('u', login, SETTINGS,
+                                             str(tmp_path)))
+    assert res is done
+    assert calls == [dict(url='u', tmpdir=str(tmp_path), max_bytes=10**6,
+                          cookies='/x/cookies.txt', stall_timeout=5.0,
+                          quality='720', pot_provider='http://bgutil:4416')]
+    assert login.used is True       # so the rotated jar is saved back
+
+
+def test_a_typed_failure_keeps_its_reason_and_the_login_hint(monkeypatch):
+    _resolving(monkeypatch, resolver.ResolveError(
+        'Sign in to confirm your age', kind='auth'))
+    login = _Login(hint=' (no YouTube login stored)')
+    failure = asyncio.run(resolver.resolve_async('u', login, SETTINGS))
+    assert isinstance(failure, resolver.Failure)
+    assert (failure.emoji, failure.reason, failure.retryable) == (
+        '🚫', 'Sign in to confirm your age (no YouTube login stored)', False)
+    assert login.used is False
+
+
+def test_a_retryable_failure_stays_retryable(monkeypatch):
+    _resolving(monkeypatch, resolver.DownloadStalled('stalled for 120s'))
+    failure = asyncio.run(resolver.resolve_async('u', _Login(), SETTINGS))
+    assert (failure.emoji, failure.retryable) == ('❌', True)
+
+
+def test_a_resolve_that_hangs_is_cut_off_and_worth_a_retry(monkeypatch):
+    monkeypatch.setattr(resolver, 'resolve',
+                        lambda *a, **kw: time.sleep(0.3))
+    settings = dataclasses.replace(SETTINGS, max_duration=0.05)
+    failure = asyncio.run(resolver.resolve_async('u', _Login(), settings))
+    assert (failure.emoji, failure.retryable) == ('❌', True)
+    assert failure.reason == 'it hung for 0.05s without downloading anything'
+
+
+def test_an_unexpected_failure_is_logged_with_its_traceback(monkeypatch,
+                                                            caplog):
+    _resolving(monkeypatch, KeyError('formats'))
+    with caplog.at_level(logging.ERROR):
+        failure = asyncio.run(resolver.resolve_async('u', _Login(), SETTINGS))
+    assert (failure.emoji, failure.retryable) == ('❌', False)
+    assert failure.reason == 'unexpected error: KeyError (see container log)'
+    assert any(r.exc_info for r in caplog.records)
+
+
+def test_without_ytdlp_the_failure_says_so(monkeypatch):
+    _resolving(monkeypatch, None)
+    failure = asyncio.run(resolver.resolve_async('u', _Login(), SETTINGS))
+    assert (failure.emoji, failure.reason) == (
+        '🚫', 'the link resolver is unavailable')

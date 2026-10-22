@@ -6,6 +6,7 @@ silently ingests nothing. The readers look at os.environ when called, so
 most cases set the variable and call them directly; the startup cases
 import a bot's config in a fresh interpreter.
 """
+import importlib
 import os
 import subprocess
 import sys
@@ -125,6 +126,16 @@ def test_an_unknown_quality_names_itself(monkeypatch, quality):
             'DISCORD_YTDLP_QUALITY must be one of '
             f"best/2160/1440/1080/720/480, got '{quality}'")):
         env.ytdlp_settings('DISCORD')
+
+
+@pytest.mark.parametrize('bot', ['discord_bot', 'telegram_bot'])
+def test_a_bot_bundles_its_ytdlp_names_when_it_resolves(monkeypatch, bot):
+    """The bots read the YTDLP_* names at call time and the tests patch
+    them, so the bundle is built from the names, not kept from import."""
+    config = importlib.import_module(f'{bot}.config')
+    assert env.YtdlpSettings.from_config(config) == config._ytdlp
+    monkeypatch.setattr(config, 'YTDLP_QUALITY', '480')
+    assert env.YtdlpSettings.from_config(config).quality == '480'
 
 
 def test_the_bots_accept_what_the_index_accepts():

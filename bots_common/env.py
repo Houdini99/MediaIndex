@@ -6,8 +6,8 @@ not surface three hours later as a bot that silently ingests nothing.
 These are the readers both config modules use, plus the yt-dlp block the
 two bots share apart from its DISCORD_/TELEGRAM_ prefix.
 """
+import dataclasses
 import os
-from dataclasses import dataclass
 
 YTDLP_QUALITIES = ('best', '2160', '1440', '1080', '720', '480')
 
@@ -41,9 +41,11 @@ def flag(name, default):
     return raw != 'false' if default else raw == 'true'
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class YtdlpSettings:
-    """The yt-dlp resolver's settings, the same for both bots."""
+    """The yt-dlp resolver's settings, the same for both bots. Each bot's
+    config copies them into YTDLP_* names (YTDLP_QUALITY for `quality`,
+    …), which the bot reads at call time and the tests patch."""
     # {prefix}_YTDLP: 'false' disables the resolver (a missing yt-dlp
     # module disables it too).
     enabled: bool
@@ -79,6 +81,12 @@ class YtdlpSettings:
     # confirm you're not a bot" for a server IP, so most public videos
     # need no login at all. Empty disables it.
     pot_provider: str
+
+    @classmethod
+    def from_config(cls, config):
+        """The settings as a bot config's YTDLP_* names hold them now."""
+        return cls(**{f.name: getattr(config, f'YTDLP_{f.name.upper()}')
+                      for f in dataclasses.fields(cls)})
 
 
 def ytdlp_settings(prefix):

@@ -33,6 +33,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   clock that each message arriving during the pause could start over
   (a DM, or a Telegram sender whose account link was not cached), so a
   busy bot stayed paused for longer.
+- The bots word a failed link download the same way. A link that hangs
+  before downloading reads "it hung for 1800s without downloading
+  anything" on Discord too, and an unexpected failure reads "unexpected
+  error: … (see container log)" on Telegram too.
 - When the index answers an upload with 404 (in practice a wrong
   `INDEX_INTERNAL_URL`), the Discord bot fails that file with "the index
   returned HTTP 404", like the Telegram bot and any other refused upload.
@@ -43,8 +47,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   number settings. Before, it turned the log channel off without a word.
 - Code clean-up from an audit, with no change in behaviour: dead code
   removed; the bots share one download path, one module that reads
-  their settings (`bots_common/env.py`) and one client for the index's
-  API with the account-link cache (`bots_common/index_client.py`), and
+  their settings (`bots_common/env.py`), one client for the index's API
+  with the account-link cache (`bots_common/index_client.py`) and one
+  wrapper around the yt-dlp download (`resolver.resolve_async()`), and
   the app one helper each for decrypting a private file, parsing id lists
   and checking the bots' API accounts; the database modules lost their
   wrapper and set-up functions; the pages share one header, one set of

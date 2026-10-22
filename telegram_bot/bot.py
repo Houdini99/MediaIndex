@@ -35,7 +35,7 @@ from telegram.ext import (
     filters,
 )
 
-from bots_common import resolver, site_logins
+from bots_common import env, resolver, site_logins
 from bots_common.index_client import AuthError, IndexUnavailable
 
 from . import config, download, parsing
@@ -555,51 +555,15 @@ class IndexBot:
             return None
 
     async def _run_resolver(self, message, item, label, login):
-        """The resolve itself. The blocking work goes to a thread under a
-        hard ceiling that only covers a resolve hanging during
-        *extraction*: once bytes are moving the resolver's own stall
-        watchdog takes over, and that watches progress rather than total
-        time, so a large but healthy download is never cut off.
-        """
-        try:
-            res = await asyncio.wait_for(
-                asyncio.to_thread(resolver.resolve, item.url,
-                                  tempfile.gettempdir(),
-                                  config.YTDLP_MAX_BYTES,
-                                  login.path,
-                                  config.YTDLP_STALL_TIMEOUT,
-                                  quality=config.YTDLP_QUALITY,
-                                  pot_provider=config.YTDLP_POT_PROVIDER),
-                timeout=config.YTDLP_MAX_DURATION)
-        except asyncio.TimeoutError:
-            logging.warning("resolver: exceeded the %gs hard ceiling for %s",
-                            config.YTDLP_MAX_DURATION, item.url)
+        """The resolve itself (resolver.resolve_async): the downloaded
+        file's path, or None once the failure has been reported."""
+        res = await resolver.resolve_async(
+            item.url, login, env.YtdlpSettings.from_config(config))
+        if isinstance(res, resolver.Failure):
             await self._reply(
                 message,
-                f"❌ {label} — it hung for {config.YTDLP_MAX_DURATION:g}s "
-                f"without downloading anything.")
+                f"{res.emoji} {label} — {html.escape(res.reason, quote=False)}.")
             return None
-        except resolver.ResolveError as e:
-            # Typed and specific (stalled, over the cap, blocked, no video
-            # there, login required) — worth repeating verbatim instead of
-            # "it failed", with what an admin can do about a login.
-            reason = e.reason + login.hint(e)
-            logging.warning("resolver: %s — %s", item.url, reason)
-            await self._reply(
-                message,
-                f"{e.emoji} {label} — {html.escape(reason, quote=False)}.")
-            return None
-        except Exception as e:
-            logging.exception("resolver: unexpected failure for %s", item.url)
-            await self._reply(
-                message,
-                f"❌ {label} — the download failed ({type(e).__name__}).")
-            return None
-        if res is None:      # only reachable with the resolver disabled
-            await self._reply(
-                message, f"🚫 {label} — the link resolver is unavailable.")
-            return None
-        login.used = res.used_cookies
         item.filename = res.filename
         item.ext = parsing.file_ext(res.filename)
         item.site = res.site

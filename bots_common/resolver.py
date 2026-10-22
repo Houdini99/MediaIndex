@@ -19,11 +19,13 @@ PO-token provider for YouTube's "confirm you're not a bot" check, and a
 quality cap with H.264 preferred, so a 4K VP9 master neither blows the
 size cap nor lands as a file half the browsers can't play.
 """
+import asyncio
 import contextlib
 import glob
 import logging
 import os
 import re
+import tempfile
 import time
 import urllib.parse
 import uuid
@@ -285,6 +287,18 @@ class Resolved:
         self.used_cookies = used_cookies
 
 
+class Failure:
+    """Why resolve_async() settled a link without a file: the reaction
+    emoji, a reason fit to show the sender, and whether a later attempt
+    could succeed (the Discord bot's retry queue reads it)."""
+    __slots__ = ('emoji', 'reason', 'retryable')
+
+    def __init__(self, emoji, reason, retryable=False):
+        self.emoji = emoji
+        self.reason = reason
+        self.retryable = retryable
+
+
 class Probe:
     """What a link holds, found out without downloading it."""
     __slots__ = ('title', 'duration', 'is_playlist', 'entry_count',
@@ -469,6 +483,48 @@ def resolve(url, tmpdir, max_bytes, cookies=None, stall_timeout=None, *,
         opts['progress_hooks'] = [_progress_hook(url, ctl)]
         info = _download(url, opts, ctl, pattern, max_bytes, stall_timeout)
     return _finish(url, info, pattern, max_bytes, used_cookies)
+
+
+async def resolve_async(url, login, settings, tmpdir=None):
+    """resolve() as both bots run it: in a thread, logged in with `login`
+    (a site_logins.LoginRun, whose `used` it sets), under `settings` (an
+    env.YtdlpSettings). Returns a Resolved, or a Failure carrying what to
+    tell the sender; it never raises for a failed link, and it does the
+    logging, so a bot only words its reply.
+
+    `settings.max_duration` is a hard ceiling that only covers a resolve
+    hanging during *extraction*: once bytes are moving, the stall
+    watchdog takes over, and that watches progress rather than total
+    time, so a large but healthy download is never cut off.
+    """
+    try:
+        res = await asyncio.wait_for(
+            asyncio.to_thread(resolve, url, tmpdir or tempfile.gettempdir(),
+                              settings.max_bytes, login.path,
+                              settings.stall_timeout,
+                              quality=settings.quality,
+                              pot_provider=settings.pot_provider),
+            timeout=settings.max_duration)
+    except asyncio.TimeoutError:
+        logging.warning("resolver: exceeded the %gs hard ceiling for %s",
+                        settings.max_duration, url)
+        return Failure('❌', f"it hung for {settings.max_duration:g}s "
+                             f"without downloading anything", retryable=True)
+    except ResolveError as e:
+        # Typed and specific (stalled, over the cap, blocked, no video
+        # there, login required): worth repeating verbatim instead of "it
+        # failed", with what an admin can do about a login.
+        reason = e.reason + login.hint(e)
+        logging.warning("resolver: %s — %s", url, reason)
+        return Failure(e.emoji, reason, e.retryable)
+    except Exception as e:
+        logging.exception("resolver: unexpected failure for %s", url)
+        return Failure('❌', f"unexpected error: {type(e).__name__} "
+                             f"(see container log)")
+    if res is None:      # yt-dlp missing; the bots check available() first
+        return Failure('🚫', "the link resolver is unavailable")
+    login.used = res.used_cookies
+    return res
 
 
 def _download(url, opts, ctl, pattern, max_bytes, stall_timeout):
