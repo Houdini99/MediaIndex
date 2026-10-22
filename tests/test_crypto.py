@@ -4,7 +4,7 @@ import os
 import pytest
 
 from app.media.crypto import (
-    new_key, encrypt_file, iter_decrypted, plaintext_size,
+    new_key, decrypt_file, encrypt_file, iter_decrypted, plaintext_size,
     NONCE_BYTES, BLOCK_SIZE,
 )
 
@@ -23,6 +23,14 @@ def encrypted(tmp_path):
 def test_roundtrip(encrypted):
     enc_path, key, plaintext = encrypted
     assert b''.join(iter_decrypted(enc_path, key)) == plaintext
+
+
+def test_decrypt_file_writes_the_whole_plaintext(encrypted, tmp_path):
+    enc_path, key, plaintext = encrypted
+    out = tmp_path / 'out.bin'
+    out.write_bytes(b'stale leftovers from an earlier attempt' * 1000)
+    decrypt_file(enc_path, str(out), key)
+    assert out.read_bytes() == plaintext
 
 
 def test_plaintext_size(encrypted):

@@ -108,3 +108,11 @@ def iter_decrypted(
         tail = cipher.finalize()
         if tail:
             yield tail
+
+
+def decrypt_file(src_path: str, dst_path: str, key: bytes) -> None:
+    """Write the whole plaintext of `src_path` to `dst_path`, streamed in
+    chunks — the inverse of encrypt_file."""
+    with open(dst_path, 'wb') as out:
+        for chunk in iter_decrypted(src_path, key):
+            out.write(chunk)

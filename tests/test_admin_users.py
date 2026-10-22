@@ -43,15 +43,19 @@ def admin(client):
     return uid
 
 
-def _image(uid, color):
+def _png(color):
     import io
     from PIL import Image
     buf = io.BytesIO()
     Image.new('RGB', (16, 16), color).save(buf, format='PNG')
+    return buf.getvalue()
+
+
+def _image(uid, color, private=False):
     fd, tmp = tempfile.mkstemp(dir=Config.UPLOAD_FOLDER, suffix='.png')
     with os.fdopen(fd, 'wb') as fh:
-        fh.write(buf.getvalue())
-    status, digest = ingest_file(tmp, 'png', 'x', uid, False)
+        fh.write(_png(color))
+    status, digest = ingest_file(tmp, 'png', 'x', uid, private)
     assert status == 'ok'
     return get_media_by_hash(digest)[0]
 
@@ -97,6 +101,29 @@ def test_deleting_a_user_removes_their_media(client, admin):
         cur = conn.cursor()
         cur.execute("SELECT 1 FROM media.media WHERE id=%s", (mid,))
         assert cur.fetchone() is None
+
+
+def test_reassigned_private_media_opens_with_the_new_owners_key(client, admin):
+    """The old owner's key is deleted with them, so their private file and
+    thumbnail must be re-encrypted for the new owner, not merely handed
+    over."""
+    from app.auth.db import get_user_enc_key
+    from app.media.crypto import iter_decrypted
+    from app.media.db import get_media_by_id, media_path, thumb_path
+
+    carol, dave = _create('carol'), _create('dave')
+    mid = _image(carol, 'teal', private=True)
+
+    resp = client.post(f'/admin/users/{carol}/delete',
+                       data={'media_action': f'reassign:{dave}'})
+
+    assert resp.status_code == 302
+    row = get_media_by_id(mid)
+    assert row['uploaded_by'] == dave and row['is_private']
+    key = get_user_enc_key(dave)
+    assert b''.join(iter_decrypted(media_path(row['filepath']), key)) == _png('teal')
+    thumb = b''.join(iter_decrypted(thumb_path(row['thumb']), key))
+    assert thumb.startswith(b'\x89PNG')
 
 
 def test_existing_databases_get_the_constraint_rewritten(app):

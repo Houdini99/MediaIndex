@@ -25,7 +25,7 @@ from PIL import Image
 
 from ..auth.db import get_user_enc_key
 from ..config import Config
-from .crypto import encrypt_file, iter_decrypted, strip_enc
+from .crypto import decrypt_file, encrypt_file, strip_enc
 from .db import get_image_rows, media_path, replace_thumb, thumb_path
 from .dupes_db import forget_hashes
 from .processing import thumbnail_image, versioned_thumb_name
@@ -45,9 +45,7 @@ def _plaintext(src, key, tag):
     tmp = os.path.join(Config.tmp_dir(),
                        f"rethumb-{tag}-{strip_enc(os.path.basename(src))}")
     try:
-        with open(tmp, 'wb') as out:
-            for chunk in iter_decrypted(src, key):
-                out.write(chunk)
+        decrypt_file(src, tmp, key)
         yield tmp
     finally:
         if os.path.exists(tmp):

@@ -24,7 +24,7 @@ import queue
 import threading
 
 from ..config import Config
-from .crypto import encrypt_file, iter_decrypted, strip_enc
+from .crypto import decrypt_file, encrypt_file, strip_enc
 from .db import replace_thumb
 
 _queue = queue.Queue()
@@ -131,9 +131,7 @@ def _render(src_path, thumb_dst, key):
     tmp_src = os.path.join(scratch, f"thumb-src-{plain_name}")
     tmp_thumb = os.path.join(scratch, f"thumb-out-{plain_name}.png")
     try:
-        with open(tmp_src, 'wb') as out:
-            for chunk in iter_decrypted(src_path, key):
-                out.write(chunk)
+        decrypt_file(src_path, tmp_src, key)
         gen_video_thumb(tmp_src, tmp_thumb)
         encrypt_file(tmp_thumb, thumb_dst, key)
     finally:

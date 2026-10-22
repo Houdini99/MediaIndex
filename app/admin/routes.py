@@ -143,12 +143,10 @@ def _reencrypt_file(path, old_key, new_key):
     beside `path` in UPLOAD_FOLDER/THUMB_FOLDER) so this user's plaintext is
     never momentarily reachable through the serving routes.
     """
-    from ..media.crypto import iter_decrypted, encrypt_file
+    from ..media.crypto import decrypt_file, encrypt_file
     tmp = os.path.join(Config.tmp_dir(), os.path.basename(path) + '.reenc')
     try:
-        with open(tmp, 'wb') as out:
-            for chunk in iter_decrypted(path, old_key):
-                out.write(chunk)
+        decrypt_file(path, tmp, old_key)
         encrypt_file(tmp, path, new_key)
     finally:
         if os.path.exists(tmp):

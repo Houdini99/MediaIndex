@@ -13,7 +13,7 @@ from datetime import datetime
 from ..auth.db import get_or_create_user_enc_key, get_user_enc_key
 from ..config import Config
 from ..notifications import build_media_event, publish_event
-from .crypto import ENC_SUFFIX, enc_name, encrypt_file, iter_decrypted, strip_enc
+from .crypto import ENC_SUFFIX, decrypt_file, enc_name, encrypt_file, strip_enc
 from .db import (
     get_media_privacy_state,
     get_privacy_for_file,
@@ -133,12 +133,6 @@ def ingest_file(tmp_path, ext, tags, uid, is_private, premade_thumb=None,
     return 'duplicate', fh
 
 
-def _decrypt_file(src_enc, dst, key):
-    with open(dst, 'wb') as out:
-        for chunk in iter_decrypted(src_enc, key):
-            out.write(chunk)
-
-
 def set_media_privacy(mid, private, user_id, is_admin=False):
     """Flip one media row between public and private, converting its file
     and thumbnail on disk. Encryption always uses the *owner's* key (also
@@ -185,7 +179,7 @@ def set_media_privacy(mid, private, user_id, is_admin=False):
             if private:
                 encrypt_file(src, dst, key)
             else:
-                _decrypt_file(src, dst, key)
+                decrypt_file(src, dst, key)
             converted.append((src, dst))
     except Exception:
         for _, dst in converted:
