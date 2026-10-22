@@ -29,6 +29,17 @@ def test_bootstrap_admin_can_open_admin_panel(app, client):
     assert client.get('/admin/').status_code == 403
 
 
+def test_admin_pages_send_a_logged_out_visitor_to_the_login_page(app, client):
+    """admin_required runs login_required first: no session means the
+    login page, not a 403."""
+    _create('first')
+    for method, path in (('get', '/admin/'), ('post', '/admin/users/create')):
+        resp = getattr(client, method)(path)
+        assert resp.status_code == 302, path
+        assert resp.headers['Location'].endswith('/login'), path
+    assert b'Please log in.' in client.get('/login').data
+
+
 def test_concurrent_registrations_produce_exactly_one_admin(app):
     """The bootstrap race.
 

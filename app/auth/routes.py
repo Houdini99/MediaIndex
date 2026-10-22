@@ -25,10 +25,6 @@ from ..extensions import limiter
 from ..security_log import failed_login, log_event
 
 
-def _client_ip():
-    return get_remote_address()
-
-
 #: Letters, digits, '.', '_' and '-', at most 32 characters. Not cosmetic:
 #: the name is embedded in the auto-added `user:<name>` tag, where a comma
 #: would split it into two tags, and it is the username half of HTTP Basic
@@ -43,10 +39,21 @@ def valid_username(name):
     return bool(_USERNAME_RE.fullmatch(name or ''))
 
 
+#: The one password-length rule: the forms here and in admin/,
+#: scripts/set_password.py, and every password input's minlength.
+MIN_PASSWORD_LENGTH = 8
+PASSWORD_RULE = f'The password must be at least {MIN_PASSWORD_LENGTH} characters long.'
+
+
+@auth_bp.app_context_processor
+def inject_password_rule():
+    return {'min_password_length': MIN_PASSWORD_LENGTH}
+
+
 # ── Block permanently banned IPs on every request ─────────────────────────
 @auth_bp.before_app_request
 def block_banned_ips():
-    if is_ip_banned(_client_ip()):
+    if is_ip_banned(get_remote_address()):
         abort(403)
 
 
@@ -96,13 +103,10 @@ def login_required(view):
 def admin_required(view):
     @wraps(view)
     def wrapped_view(**kwargs):
-        if g.user is None:
-            flash('Please log in.', 'warning')
-            return redirect(url_for('auth.login'))
         if not g.user.get('is_admin'):
             abort(403)
         return view(**kwargs)
-    return wrapped_view
+    return login_required(wrapped_view)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
@@ -119,8 +123,8 @@ def register():
             flash('Username and password are required.', 'danger')
         elif not valid_username(username):
             flash(USERNAME_RULE, 'danger')
-        elif len(password) < 8:
-            flash('The password must be at least 8 characters long.', 'danger')
+        elif len(password) < MIN_PASSWORD_LENGTH:
+            flash(PASSWORD_RULE, 'danger')
         else:
             pw_hash = generate_password_hash(password)
             # Local import: avoids a circular import via app.media at module load
@@ -150,7 +154,7 @@ def login():
         row = fetch_user_for_login(username)
 
         if row and check_password_hash(row[1], password):
-            reset_failed_logins(_client_ip())
+            reset_failed_logins(get_remote_address())
             session.clear()
             # Must come *after* clear(): `permanent` is stored as the '_permanent'
             # key inside the session itself, so clearing wipes it too. This is what
@@ -164,7 +168,7 @@ def login():
             return redirect('/')
         else:
             failed_login(username, 'login', known=row is not None)
-            if is_ip_banned(_client_ip()):
+            if is_ip_banned(get_remote_address()):
                 abort(403)
             flash('Invalid login credentials.', 'danger')
 
@@ -184,11 +188,11 @@ def _change_password_from_form(via):
     row = fetch_user_for_login(g.user['username'])
     if not row or not check_password_hash(row[1], current):
         failed_login(g.user['username'], 'password-change', known=True)
-        if is_ip_banned(_client_ip()):
+        if is_ip_banned(get_remote_address()):
             abort(403)
         return 'Your current password is wrong.'
-    if len(new) < 8:
-        return 'The new password must be at least 8 characters long.'
+    if len(new) < MIN_PASSWORD_LENGTH:
+        return f'The new password must be at least {MIN_PASSWORD_LENGTH} characters long.'
     if new != request.form.get('confirm_password', ''):
         return "The new passwords don't match."
     if new == current:
@@ -235,14 +239,7 @@ def change_password():
 
 @auth_bp.route('/logout', methods=('POST',))
 def logout():
+    # Saving the emptied session deletes the cookie, under the configured
+    # name, path, domain and flags.
     session.clear()
-    response = redirect(url_for('auth.login'))
-    response.set_cookie(
-        key='session',
-        value='',
-        expires=0,
-        secure=Config.SESSION_COOKIE_SECURE,
-        httponly=True,
-        samesite='Lax'
-    )
-    return response
+    return redirect(url_for('auth.login'))

@@ -29,7 +29,9 @@ from .integrity import (
     cleanup_orphan_thumbs,
     rerender_placeholder_thumbs,
 )
-from ..auth.routes import USERNAME_RULE, admin_required, valid_username
+from ..auth.routes import (
+    MIN_PASSWORD_LENGTH, PASSWORD_RULE, USERNAME_RULE, admin_required, valid_username,
+)
 from ..auth.db import (
     fetch_all_users,
     fetch_user_by_id,
@@ -119,8 +121,8 @@ def create_user():
         flash('Username and password are required.', 'danger')
     elif not valid_username(username):
         flash(USERNAME_RULE, 'danger')
-    elif len(password) < 8:
-        flash('The password must be at least 8 characters long.', 'danger')
+    elif len(password) < MIN_PASSWORD_LENGTH:
+        flash(PASSWORD_RULE, 'danger')
     else:
         pw_hash = generate_password_hash(password)
         from ..media.crypto import new_key
@@ -230,8 +232,8 @@ def remove_user(user_id):
 def change_password(user_id):
     password = request.form.get('password', '')
     own = user_id == g.user['id']
-    if len(password) < 8:
-        flash('The password must be at least 8 characters long.', 'danger')
+    if len(password) < MIN_PASSWORD_LENGTH:
+        flash(PASSWORD_RULE, 'danger')
     # Someone else's new password is one the admin knows, so that user
     # replaces it with their own at their next login.
     elif update_user_password(user_id, generate_password_hash(password),

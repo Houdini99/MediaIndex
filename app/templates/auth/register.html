@@ -11,7 +11,7 @@
     </div>
     <div class="field">
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" placeholder="Choose a secure password" required minlength="8" autocomplete="new-password">
+      <input id="password" name="password" type="password" placeholder="Choose a secure password" required minlength="{{ min_password_length }}" autocomplete="new-password">
     </div>
     <button class="submit-btn" type="submit">Create Account</button>
   </form>

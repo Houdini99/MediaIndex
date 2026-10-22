@@ -177,6 +177,24 @@ def test_form_refuses_bad_input(app, client):
     assert client.get('/').headers['Location'].endswith('/login/new-password')
 
 
+def test_every_password_input_carries_the_one_length_rule(app, client, monkeypatch):
+    """MIN_PASSWORD_LENGTH drives the server checks and the minlength of
+    every password input, so the two cannot drift apart."""
+    import app.auth.routes as auth_routes
+    from app.config import Config
+    monkeypatch.setattr(auth_routes, 'MIN_PASSWORD_LENGTH', 12)
+    monkeypatch.setattr(Config, 'REGISTRATION_OPEN', True)
+    assert b'minlength="12"' in client.get('/register').data
+    _create('root', admin=True)
+    _login(client, 'root')
+    for page in ('/settings', '/admin/'):
+        html = client.get(page).data
+        assert b'minlength="12"' in html and b'minlength="8"' not in html, page
+    resp = client.post('/settings/password', data=_form(new='elevenchars'),
+                       follow_redirects=True)
+    assert b'at least 12 characters' in resp.data
+
+
 def test_form_is_only_for_accounts_that_must_change(app, client):
     _create('alice')
     _login(client, 'alice')

@@ -5,6 +5,7 @@ PostgreSQL-only: schema-qualified names (users.users, users.failed_logins),
 real booleans, timestamptz values.
 """
 import hashlib
+import hmac
 import logging
 import re
 import secrets
@@ -132,6 +133,16 @@ def fetch_user_for_dav(username):
         return conn.execute(
             "SELECT id, dav_password_hash FROM users.users WHERE username=%s",
             (username,)).fetchone()
+
+
+def check_app_password(username, password):
+    """Check an app password (WebDAV, /api/upload). Returns (user_id,
+    known): user_id is None unless the password matches, and known says
+    whether the username exists at all, for the failed-login log."""
+    row = fetch_user_for_dav(username)
+    if row and row[1] and hmac.compare_digest(hash_dav_password(password), row[1]):
+        return row[0], True
+    return None, row is not None
 
 
 def get_dav_password_created(user_id):

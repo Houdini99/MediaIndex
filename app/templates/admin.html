@@ -52,7 +52,7 @@
           <td class="col-actions">
             <form method="post" action="{{ url_for('admin.change_password', user_id=uid) }}" class="inline-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-              <input type="password" name="password" placeholder="New password" minlength="8" required autocomplete="new-password">
+              <input type="password" name="password" placeholder="New password" minlength="{{ min_password_length }}" required autocomplete="new-password">
               <button type="submit" class="btn btn-ghost btn-sm">Set password</button>
             </form>
             {% if uid != g.user.id %}
@@ -86,7 +86,7 @@
     <form method="post" action="{{ url_for('admin.create_user') }}" class="admin-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <input type="text" name="username" placeholder="Username" required autocomplete="off">
-      <input type="password" name="password" placeholder="Password (min. 8 characters)" minlength="8" required autocomplete="new-password">
+      <input type="password" name="password" placeholder="Password (min. {{ min_password_length }} characters)" minlength="{{ min_password_length }}" required autocomplete="new-password">
       <button type="submit" class="btn btn-primary btn-sm">Create user</button>
     </form>
   </div>

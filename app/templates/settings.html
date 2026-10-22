@@ -19,10 +19,10 @@
                required autocomplete="current-password">
         <label class="link-label" for="newPassword">New password</label>
         <input type="password" id="newPassword" name="new_password" class="link-input"
-               required minlength="8" placeholder="At least 8 characters" autocomplete="new-password">
+               required minlength="{{ min_password_length }}" placeholder="At least {{ min_password_length }} characters" autocomplete="new-password">
         <label class="link-label" for="confirmPassword">Repeat the new password</label>
         <input type="password" id="confirmPassword" name="confirm_password" class="link-input"
-               required minlength="8" autocomplete="new-password">
+               required minlength="{{ min_password_length }}" autocomplete="new-password">
         <div class="link-actions">
           <button type="submit" class="btn btn-primary">Change password</button>
         </div>

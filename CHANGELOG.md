@@ -63,8 +63,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   their settings (`bots_common/env.py`), one client for the index's API
   with the account-link cache (`bots_common/index_client.py`) and one
   wrapper around the yt-dlp download (`resolver.resolve_async()`), and
-  the app one helper each for decrypting a private file, parsing id lists
-  and checking the bots' API accounts; the database modules lost their
+  the app one helper each for decrypting a private file, parsing id lists,
+  checking the bots' API accounts and checking an app password (WebDAV
+  and the upload API), and one place for the minimum password length
+  (the forms, their inputs and `set_password.py`); logging out leaves
+  deleting the session cookie to Flask; the database modules lost their
   wrapper and set-up functions and their hand-made cursors and commits;
   the pages share one header, one set of card and button styles, and the
   sign-in pages one layout.

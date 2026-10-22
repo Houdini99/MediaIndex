@@ -24,10 +24,8 @@ import _bootstrap  # sys.path + SECRET_KEY; must precede app.*
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.auth.db import fetch_user_for_login, update_user_password
+from app.auth.routes import MIN_PASSWORD_LENGTH
 from app.security_log import log_event
-
-# Matches the registration rule in app/auth/routes.py.
-MIN_PASSWORD_LENGTH = 8
 
 
 def prompt_password() -> str:

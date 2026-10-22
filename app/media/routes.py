@@ -3,7 +3,6 @@
 All persistence calls go through app.media.db; image/video processing
 calls go through app.media.processing.
 """
-import hmac
 import mimetypes
 import os
 import random
@@ -36,9 +35,8 @@ from .tagging import tag_list
 from .crypto import ENC_SUFFIX, iter_decrypted, plaintext_size, strip_enc
 from .ingest import ingest_file, set_media_privacy
 from ..auth.db import (
-    fetch_user_for_dav,
+    check_app_password,
     get_user_enc_key,
-    hash_dav_password,
     claim_discord_link_code,
     resolve_discord_user,
     resolve_telegram_user,
@@ -554,12 +552,11 @@ def _api_user():
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
         return None
-    row = fetch_user_for_dav(auth.username)
-    if not row or not row[1] or not hmac.compare_digest(
-            hash_dav_password(auth.password), row[1]):
-        failed_login(auth.username, 'api', known=row is not None)
+    uid, known = check_app_password(auth.username, auth.password)
+    if uid is None:
+        failed_login(auth.username, 'api', known=known)
         return None
-    return {'id': row[0], 'username': auth.username}
+    return {'id': uid, 'username': auth.username}
 
 
 def _duplicate_of(fh):

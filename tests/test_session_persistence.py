@@ -59,3 +59,21 @@ def test_expired_cookie_is_rejected(app, client):
     resp = client.get('/admin/')
     assert resp.status_code == 302
     assert '/login' in resp.headers['Location']
+
+
+def test_logout_deletes_the_session_cookie(app, client):
+    """Flask deletes the cookie itself when the emptied session is saved,
+    with the configured name and flags; logout adds no cookie of its own."""
+    _create()
+    _login(client)
+    resp = client.post('/logout')
+
+    cookies = [h for k, h in resp.headers.items()
+               if k.lower() == 'set-cookie' and h.startswith('session=')]
+    assert len(cookies) == 1, cookies
+    cookie = cookies[0]
+    assert cookie.startswith('session=;') and 'Max-Age=0' in cookie, cookie
+    assert 'HttpOnly' in cookie and 'SameSite=Lax' in cookie, cookie
+    assert ('Secure' in cookie) == app.config['SESSION_COOKIE_SECURE'], cookie
+    assert resp.headers['Location'].endswith('/login')
+    assert client.get('/admin/').status_code == 302

@@ -6,16 +6,11 @@ and enforces the same IP-ban system as the Flask side, which matters here
 because Flask's before_app_request hooks never run for the dispatched
 /dav branch.
 """
-import hmac
 import os
 
 from wsgidav.dc.base_dc import BaseDomainController
 
-from ..auth.db import (
-    fetch_user_for_dav,
-    hash_dav_password,
-    is_ip_banned,
-)
+from ..auth.db import check_app_password, is_ip_banned
 from ..config import Config
 from ..security_log import failed_login
 
@@ -39,13 +34,11 @@ class MediaIndexDomainController(BaseDomainController):
         ip = environ.get('REMOTE_ADDR', '')
         if is_ip_banned(ip):
             return False
-        row = fetch_user_for_dav(user_name)
-        if (not row or not row[1]
-                or not hmac.compare_digest(hash_dav_password(password), row[1])):
-            failed_login(user_name, 'webdav', known=row is not None, ip=ip,
+        uid, known = check_app_password(user_name, password)
+        if uid is None:
+            failed_login(user_name, 'webdav', known=known, ip=ip,
                          ua=environ.get('HTTP_USER_AGENT'))
             return False
-        uid = row[0]
         environ[ENVIRON_USER_ID] = uid
         # First DAV contact after account creation: make the user's inbox.
         os.makedirs(os.path.join(Config.STAGING_DIR, str(uid)), exist_ok=True)
