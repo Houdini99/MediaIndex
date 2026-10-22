@@ -31,11 +31,10 @@ Example:
 import argparse
 import sys
 
-import _bootstrap  # noqa: F401  (sys.path + SECRET_KEY; must precede app.*)
+import _bootstrap  # sys.path + SECRET_KEY; must precede app.*
 
 from app.auth.db import fetch_user_for_login, update_user_password
 from app.security_log import log_event
-from app.config import Config
 
 
 # ── Hash validation ────────────────────────────────────────────────────────
@@ -74,12 +73,7 @@ def main() -> int:
     parser.add_argument('--hash-file', help='Read the hash from this file instead of prompting.')
     args = parser.parse_args()
 
-    if not Config.DATABASE_URL:
-        print('DATABASE_URL is not set — run inside the web container:\n'
-              '  docker exec -i mediaindex-web python scripts/set_password_hash.py <username>',
-              file=sys.stderr)
-        return 1
-
+    _bootstrap.require_db(tty=False)
     row = fetch_user_for_login(args.username)
     if row is None:
         print(f"No such user: {args.username!r}", file=sys.stderr)

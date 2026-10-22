@@ -18,7 +18,7 @@ Usage:
 """
 import argparse
 
-import _bootstrap  # noqa: F401  (sys.path + SECRET_KEY; must precede app.*)
+import _bootstrap  # sys.path + SECRET_KEY; must precede app.*
 
 from app.media.thumb_repair import repair_rotated_thumbs
 
@@ -32,6 +32,7 @@ def main():
                    help="Re-render every image thumbnail, rotated or not")
     args = p.parse_args()
 
+    _bootstrap.require_db()
     repaired, skipped = repair_rotated_thumbs(dry_run=args.dry_run,
                                               everything=args.all)
     for mid, old, new, orientation in repaired:

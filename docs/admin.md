@@ -157,9 +157,7 @@ docker exec -it mediaindex-web python scripts/<script> <arguments>
 |---|---|
 | `set_password.py <username>` | Sets a user's password. It asks for the password, so it never appears on the command line. Logs the user out everywhere. Unlike a reset on the admin panel, it doesn't make the user choose a new password. |
 | `set_password_hash.py <username>` | Stores a ready-made Werkzeug password hash, read from standard input. |
-| `rename_tag.py <old> <new> [--dry-run]` | Renames a tag everywhere. |
-| `remove_tag.py <tag> [--dry-run]` | Removes a tag everywhere. |
-| `normalize_tags.py [--dry-run]` | Rewrites tag strings that aren't in the stored form (for example with spaces around the commas), so every tag can be found. It changes only rows that need it, and never reorders or adds a tag. |
+| `tags.py rename <old> <new> [--dry-run]`<br>`tags.py remove <tag> [--dry-run]`<br>`tags.py normalize [--dry-run]` | Renames a tag everywhere, removes a tag everywhere, or rewrites the tag strings that aren't in the stored form (for example with spaces around the commas), so every tag can be found. `normalize` changes only rows that need it, and never reorders or adds a tag. |
 | `regen_image_thumbs.py [--dry-run] [--all]` | Renders image thumbnails again: by default those of photos with an EXIF rotation, with `--all` every image, private ones included. Each new thumbnail gets a new file name, so browsers don't keep showing the old one. |
 
 Run a script with `--dry-run` first where it has one.

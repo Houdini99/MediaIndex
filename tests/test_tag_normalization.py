@@ -119,7 +119,7 @@ def _write_raw(mid, tags):
 
 
 def test_normalize_tags_backfills_legacy_rows(user):
-    """The one-off backfill behind scripts/normalize_tags.py."""
+    """The one-off backfill behind `scripts/tags.py normalize`."""
     uid, _username, _password = user
     insert_media('n8.jpg', None, 'placeholder', 'h-norm-8', uid)
     mid = _find('h-norm-8')

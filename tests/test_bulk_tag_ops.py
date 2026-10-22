@@ -4,7 +4,7 @@ These three had no coverage at all, which was only noticed when
 `rename_tag` and `remove_tag` were collapsed onto a shared
 `_rewrite_tags`: the suite went green without executing a line of what
 had changed. They are reachable from the admin panel *and* from
-scripts/rename_tag.py / scripts/remove_tag.py, and they rewrite every
+`scripts/tags.py rename` / `remove`, and they rewrite every
 matching row in one shot, so a silent regression here is expensive.
 
 The asymmetry pinned below is deliberate and load-bearing: renaming

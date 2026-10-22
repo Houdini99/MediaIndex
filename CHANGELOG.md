@@ -15,6 +15,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The three tag scripts are one, `scripts/tags.py`, with the subcommands
+  `rename <old> <new>`, `remove <tag>` and `normalize`, each with
+  `--dry-run`. `rename_tag.py`, `remove_tag.py` and `normalize_tags.py`
+  are gone. Every script that uses the database now stops with the
+  `docker exec` command to run it in the web container when
+  `DATABASE_URL` is not set, as the password scripts already did.
 - Both bot images build from one Dockerfile, `bots_common/Dockerfile`,
   with a `BOT` build argument (`discord` or `telegram`); `./build.sh`
   passes it. A stack that builds the bot images itself needs

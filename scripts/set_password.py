@@ -19,13 +19,12 @@ import argparse
 import getpass
 import sys
 
-import _bootstrap  # noqa: F401  (sys.path + SECRET_KEY; must precede app.*)
+import _bootstrap  # sys.path + SECRET_KEY; must precede app.*
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.auth.db import fetch_user_for_login, update_user_password
 from app.security_log import log_event
-from app.config import Config
 
 # Matches the registration rule in app/auth/routes.py.
 MIN_PASSWORD_LENGTH = 8
@@ -48,12 +47,7 @@ def main() -> int:
     parser.add_argument('username', help='Username whose password should be replaced.')
     args = parser.parse_args()
 
-    if not Config.DATABASE_URL:
-        print('DATABASE_URL is not set — run inside the web container:\n'
-              '  docker exec -it mediaindex-web python scripts/set_password.py <username>',
-              file=sys.stderr)
-        return 1
-
+    _bootstrap.require_db()
     row = fetch_user_for_login(args.username)
     if row is None:
         print(f"No such user: {args.username!r}", file=sys.stderr)
