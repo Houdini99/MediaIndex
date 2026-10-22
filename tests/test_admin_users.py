@@ -159,27 +159,15 @@ def test_user_routes_look_each_account_up_once(client, admin, monkeypatch):
     assert calls == [dave]
 
 
-def test_existing_databases_get_the_constraint_rewritten(app):
-    """CREATE TABLE IF NOT EXISTS never revisits a table, so databases
-    created before the fix carry the old NO ACTION constraints; boot must
-    rewrite them."""
-    import app.db_utils as db_utils
+def test_the_audit_columns_let_their_admin_be_deleted(app):
+    """The *_by columns of the duplicate finder are declared ON DELETE SET
+    NULL, so deleting the admin who acted never fails on them."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("ALTER TABLE media.dupe_job DROP CONSTRAINT dupe_job_started_by_fkey")
-        cur.execute("ALTER TABLE media.dupe_job ADD CONSTRAINT dupe_job_started_by_fkey "
-                    "FOREIGN KEY (started_by) REFERENCES users.users(id)")
-        conn.commit()
-    db_utils._pg_schema_ready = False
-    db_utils.ensure_pg_schema()
-
-    with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        rows = conn.execute(
             "SELECT conname, confdeltype FROM pg_constraint "
             "WHERE contype = 'f' AND confrelid = 'users.users'::regclass "
-            "AND conrelid::regclass::text LIKE 'media.dupe_%' ORDER BY conname")
-        rows = cur.fetchall()
+            "AND conrelid::regclass::text LIKE 'media.dupe_%' ORDER BY conname"
+        ).fetchall()
     assert rows == [('dupe_dismissed_dismissed_by_fkey', 'n'),
                     ('dupe_job_started_by_fkey', 'n'),
                     ('dupe_quarantine_marked_by_fkey', 'n')]

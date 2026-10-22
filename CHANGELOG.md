@@ -91,6 +91,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- The startup code that upgraded databases created before 1.0.0 (added
+  columns, rewritten foreign keys, a fill-in of each item's stored type).
+  A database that has run 1.0.0 already has all of it; a fresh database
+  gets the same schema as before. To upgrade from an earlier version, run
+  1.0.0 once first.
 - `/api/feed` no longer reads the old single `type` parameter, only
   `types` (the feed page and `docs/api.md` already used only `types`).
 - `FLASK_APP` is no longer set in the image or the example compose;

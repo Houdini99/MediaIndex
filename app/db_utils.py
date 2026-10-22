@@ -54,8 +54,10 @@ def db_now():
     return datetime.now(timezone.utc)
 
 
-# DDL — schemas `media` and `users`. Keep each table's column order when
-# adding a column: several consumers index row tuples positionally.
+# DDL — schemas `media` and `users`. CREATE TABLE IF NOT EXISTS never
+# changes a table that already exists, so a column added later needs its
+# own `ALTER TABLE … ADD COLUMN IF NOT EXISTS` as well, or existing
+# databases never get it. Add new columns at the end of their table.
 _PG_DDL = """
 CREATE SCHEMA IF NOT EXISTS media;
 CREATE SCHEMA IF NOT EXISTS users;
@@ -67,7 +69,25 @@ CREATE TABLE IF NOT EXISTS users.users (
     enc_key              bytea,
     is_admin             boolean     NOT NULL DEFAULT false,
     dav_password_hash    text,
-    dav_password_created timestamptz
+    dav_password_created timestamptz,
+    telegram_user_id     bigint,
+    telegram_username    text,
+    discord_user_id      bigint,
+    discord_link_code_hash text,
+    discord_link_expires timestamptz,
+    -- Session generation. Sessions are signed cookies holding only a user
+    -- id, so without this nothing server-side could end one: logging out
+    -- cleared the cookie in *that* browser, and a password change left
+    -- every other copy — including a stolen one — valid for as long as it
+    -- kept being used. Login stamps the current value into the session;
+    -- the per-request user load refuses a session whose stamp no longer
+    -- matches; a password change bumps it.
+    session_gen          integer     NOT NULL DEFAULT 0,
+    -- Set on accounts an admin creates, and when an admin resets someone
+    -- else's password: the admin chose that password and knows it. Until
+    -- the user picks their own, every page they open leads to
+    -- /login/new-password.
+    must_change_password boolean     NOT NULL DEFAULT false
 );
 
 -- Telegram ingest identity. Two columns because the website accepts
@@ -82,8 +102,6 @@ CREATE TABLE IF NOT EXISTS users.users (
 -- The partial unique indexes are load-bearing rather than hygiene:
 -- without them two index users can claim the same Telegram account and
 -- ingest silently lands on whichever row the planner returns first.
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS telegram_user_id  bigint;
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS telegram_username text;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id
     ON users.users (telegram_user_id) WHERE telegram_user_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_username
@@ -95,30 +113,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_username
 -- link proves the same person controls both accounts, and nobody can claim
 -- someone else's id by typing it. Codes are stored hashed, single use and
 -- short-lived. Unique for the same reason as the Telegram columns.
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS discord_user_id bigint;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord_id
     ON users.users (discord_user_id) WHERE discord_user_id IS NOT NULL;
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS discord_link_code_hash text;
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS discord_link_expires timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord_link_code
     ON users.users (discord_link_code_hash)
     WHERE discord_link_code_hash IS NOT NULL;
-
--- Session generation. Sessions are signed cookies holding only a user id,
--- so without this nothing server-side could end one: logging out cleared
--- the cookie in *that* browser, and a password change left every other
--- copy — including a stolen one — valid for as long as it kept being used.
--- Login stamps the current value into the session; the per-request user
--- load refuses a session whose stamp no longer matches; a password change
--- bumps it. A session from before this column existed carries no stamp and
--- counts as generation 0, so deploying it logs nobody out.
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS session_gen integer NOT NULL DEFAULT 0;
-
--- Set on accounts an admin creates, and when an admin resets someone
--- else's password: the admin chose that password and knows it. Until the
--- user picks their own, every page they open leads to /login/new-password. Existing accounts default to false, so deploying
--- this asks nobody for a new password.
-ALTER TABLE users.users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
 
 -- Site logins for the bots' yt-dlp (app/site_logins.py): one
 -- Netscape cookies.txt per platform, AES-GCM-sealed under a key derived
@@ -172,7 +171,6 @@ CREATE INDEX IF NOT EXISTS idx_media_thumb    ON media.media (thumb);
 -- the gallery makes that call twice per page (the page query and its
 -- COUNT). Leading-wildcard ILIKE would also do case-insensitive matching
 -- on names that are lowercase hex by construction.
-ALTER TABLE media.media ADD COLUMN IF NOT EXISTS ftype text;
 CREATE INDEX IF NOT EXISTS idx_media_ftype ON media.media (ftype, id DESC);
 
 CREATE TABLE IF NOT EXISTS media.staging (
@@ -196,6 +194,9 @@ CREATE INDEX IF NOT EXISTS idx_staging_user
     ON media.staging (user_id, status);
 
 -- ── Near-duplicate finder (admin panel) ──────────────────────────────────
+-- The *_by columns below are audit fields: ON DELETE SET NULL lets a row
+-- outlive the admin who acted (every reader LEFT JOINs users), so deleting
+-- that admin never fails on them.
 -- One row per sampled frame: images/GIFs contribute a single frame_idx=0
 -- row, videos one per sampled timestamp. The 64-bit perceptual hashes are
 -- stored as *signed* bigints (Postgres has no unsigned type) — see the
@@ -270,37 +271,6 @@ CREATE TABLE IF NOT EXISTS media.dupe_job (
 -- At most one running job across all workers.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dupe_job_one_running
     ON media.dupe_job ((state)) WHERE state = 'running';
-
--- The three "who did this" columns above were first created without an
--- ON DELETE action, so deleting any admin who had ever run a scan,
--- dismissed a pair or quarantined an item failed on the foreign key — and
--- it failed at the very end of admin remove_user(), after that user's media
--- and WebDAV inbox had already been deleted. They are audit fields, so the
--- row outlives its actor with a NULL (every reader LEFT JOINs users).
--- CREATE TABLE IF NOT EXISTS never revisits an existing table, so the
--- constraints on existing databases are rewritten here; the confdeltype
--- test makes it a no-op on every boot after the first.
-DO $$
-DECLARE r record;
-BEGIN
-    FOR r IN
-        SELECT c.conrelid::regclass AS tbl, c.conname, a.attname AS col
-        FROM pg_constraint c
-        JOIN pg_attribute a
-          ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
-        WHERE c.contype = 'f'
-          AND c.confrelid = 'users.users'::regclass
-          AND c.confdeltype <> 'n'
-          AND ((c.conrelid = 'media.dupe_dismissed'::regclass AND a.attname = 'dismissed_by')
-            OR (c.conrelid = 'media.dupe_quarantine'::regclass AND a.attname = 'marked_by')
-            OR (c.conrelid = 'media.dupe_job'::regclass AND a.attname = 'started_by'))
-    LOOP
-        EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.conname);
-        EXECUTE format('ALTER TABLE %s ADD CONSTRAINT %I FOREIGN KEY (%I) '
-                       'REFERENCES users.users(id) ON DELETE SET NULL',
-                       r.tbl, r.conname, r.col);
-    END LOOP;
-END $$;
 """
 
 # Both gunicorn workers run the init DDL concurrently at boot; concurrent
@@ -308,32 +278,6 @@ END $$;
 # error, so the DDL runs under a session advisory lock.
 _PG_INIT_LOCK_KEY = 0x6D656469_61  # 'media' as hex, arbitrary constant
 _pg_schema_ready = False
-
-
-def ftype_backfill_sql():
-    """UPDATE that fills `ftype` for rows predating the column.
-
-    The extension lists come from Config so this cannot drift from
-    `processing.file_type()` — the same mapping expressed in SQL, applied
-    once. `WHERE ftype IS NULL` makes it a no-op on every boot after the
-    first, and the `.enc` suffix is stripped first so a private file is
-    classified by its real extension.
-    """
-    def _match(exts):
-        alts = '|'.join(sorted(e.lower() for e in exts))
-        return f"base ~ '\\.({alts})$'"
-
-    return f"""
-    UPDATE media.media SET ftype = CASE
-        WHEN {_match(Config.ALLOWED_GIF_EXT)}   THEN 'gif'
-        WHEN {_match(Config.ALLOWED_IMAGE_EXT)} THEN 'image'
-        WHEN {_match(Config.ALLOWED_VIDEO_EXT)} THEN 'video'
-        ELSE 'unknown' END
-    FROM (SELECT id AS bid,
-                 lower(regexp_replace(filepath, '\\.enc$', '')) AS base
-          FROM media.media WHERE ftype IS NULL) AS src
-    WHERE media.media.id = src.bid AND media.media.ftype IS NULL;
-    """
 
 
 def ensure_pg_schema():
@@ -350,10 +294,6 @@ def ensure_pg_schema():
         cur.execute("SELECT pg_advisory_lock(%s)", (_PG_INIT_LOCK_KEY,))
         try:
             cur.execute(_PG_DDL)
-            # Runs inside the same advisory-locked section as the ALTER that
-            # adds the column, so no worker can observe rows with a NULL
-            # ftype and filter them out of the gallery.
-            cur.execute(ftype_backfill_sql())
             conn.commit()
         finally:
             cur.execute("SELECT pg_advisory_unlock(%s)", (_PG_INIT_LOCK_KEY,))

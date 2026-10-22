@@ -126,7 +126,10 @@ by git.
   `tests/test_no_inline_js.py` fails if an inline handler appears. Use
   `data-action` and the dispatchers in `static/js/common.js`.
 - **Schema changes are idempotent DDL** in `db_utils.py`, run at startup
-  under an advisory lock. There is no separate migration step.
+  under an advisory lock. There is no separate migration step. A new
+  column goes at the end of its `CREATE TABLE` and also gets an
+  `ALTER TABLE … ADD COLUMN IF NOT EXISTS`: an existing database never
+  runs a `CREATE TABLE` again.
 
 ## Working on the bots
 
