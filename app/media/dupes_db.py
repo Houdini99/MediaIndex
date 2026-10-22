@@ -44,14 +44,13 @@ def store_hashes(media_id, frames, source, algo_ver, width, height, bytes_,
     sample order.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM media.media_hash WHERE media_id=%s", (media_id,))
-        cur.executemany(
+        conn.execute("DELETE FROM media.media_hash WHERE media_id=%s", (media_id,))
+        conn.cursor().executemany(
             "INSERT INTO media.media_hash (media_id, frame_idx, phash, dhash, ahash) "
             "VALUES (%s,%s,%s,%s,%s)",
             [(media_id, idx, to_signed(p), to_signed(d), to_signed(a))
              for idx, (p, d, a) in enumerate(frames)])
-        cur.execute(
+        conn.execute(
             "INSERT INTO media.media_hash_meta "
             "(media_id, source, algo_ver, frames, width, height, bytes, ftype, hashed_at, error) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL) "
@@ -62,7 +61,6 @@ def store_hashes(media_id, frames, source, algo_ver, width, height, bytes_,
             "hashed_at=EXCLUDED.hashed_at, error=NULL",
             (media_id, source, algo_ver, len(frames), width, height, bytes_,
              ftype, db_now()))
-        conn.commit()
 
 
 def store_hash_error(media_id, source, algo_ver, ftype, error):
@@ -73,9 +71,8 @@ def store_hash_error(media_id, source, algo_ver, ftype, error):
     are dropped so it cannot keep matching under an old fingerprint.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM media.media_hash WHERE media_id=%s", (media_id,))
-        cur.execute(
+        conn.execute("DELETE FROM media.media_hash WHERE media_id=%s", (media_id,))
+        conn.execute(
             "INSERT INTO media.media_hash_meta "
             "(media_id, source, algo_ver, frames, ftype, hashed_at, error) "
             "VALUES (%s,%s,%s,0,%s,%s,%s) "
@@ -83,16 +80,13 @@ def store_hash_error(media_id, source, algo_ver, ftype, error):
             "source=EXCLUDED.source, algo_ver=EXCLUDED.algo_ver, frames=0, "
             "ftype=EXCLUDED.ftype, hashed_at=EXCLUDED.hashed_at, error=EXCLUDED.error",
             (media_id, source, algo_ver, ftype, db_now(), (error or '')[:500]))
-        conn.commit()
 
 
 def clear_hash_index():
     """Drop the whole fingerprint index (the "rehash everything" path)."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM media.media_hash")
-        cur.execute("DELETE FROM media.media_hash_meta")
-        conn.commit()
+        conn.execute("DELETE FROM media.media_hash")
+        conn.execute("DELETE FROM media.media_hash_meta")
 
 
 def forget_hashes(media_ids):
@@ -102,12 +96,10 @@ def forget_hashes(media_ids):
     image."""
     if not media_ids:
         return
+    ids = list(media_ids)
     with db_conn() as conn:
-        cur = conn.cursor()
-        ids = list(media_ids)
-        cur.execute("DELETE FROM media.media_hash WHERE media_id = ANY(%s)", (ids,))
-        cur.execute("DELETE FROM media.media_hash_meta WHERE media_id = ANY(%s)", (ids,))
-        conn.commit()
+        conn.execute("DELETE FROM media.media_hash WHERE media_id = ANY(%s)", (ids,))
+        conn.execute("DELETE FROM media.media_hash_meta WHERE media_id = ANY(%s)", (ids,))
 
 
 # ── Hash index: reads ──────────────────────────────────────────────────────
@@ -136,11 +128,10 @@ def fetch_hashed_ids(source, algo_ver):
     including ones recorded as errors, which must not be retried every
     run."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        rows = conn.execute(
             "SELECT media_id FROM media.media_hash_meta "
-            "WHERE source=%s AND algo_ver=%s", (source, algo_ver))
-        return {r[0] for r in cur.fetchall()}
+            "WHERE source=%s AND algo_ver=%s", (source, algo_ver)).fetchall()
+    return {r[0] for r in rows}
 
 
 def fetch_index(algo_ver):
@@ -156,24 +147,23 @@ def fetch_index(algo_ver):
     version, is excluded.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        rows = conn.execute(
             "SELECT h.media_id, h.phash, h.dhash, h.ahash "
             "FROM media.media_hash h "
             "JOIN media.media_hash_meta mm ON mm.media_id = h.media_id "
             "JOIN media.media m ON m.id = h.media_id "
             "WHERE NOT m.is_private AND mm.algo_ver = %s AND mm.error IS NULL "
-            "ORDER BY h.media_id, h.frame_idx", (algo_ver,))
+            "ORDER BY h.media_id, h.frame_idx", (algo_ver,)).fetchall()
         frames = [(mid, to_unsigned(p), to_unsigned(d), to_unsigned(a))
-                  for mid, p, d, a in cur.fetchall()]
-        cur.execute(
+                  for mid, p, d, a in rows]
+        rows = conn.execute(
             "SELECT mm.media_id, mm.source, mm.frames, mm.width, mm.height, "
             "       mm.bytes, mm.ftype, mm.hashed_at "
             "FROM media.media_hash_meta mm "
             "JOIN media.media m ON m.id = mm.media_id "
             "WHERE NOT m.is_private AND mm.algo_ver = %s AND mm.error IS NULL",
-            (algo_ver,))
-        meta = {r[0]: tuple(r[1:]) for r in cur.fetchall()}
+            (algo_ver,)).fetchall()
+    meta = {r[0]: tuple(r[1:]) for r in rows}
     return frames, meta
 
 
@@ -181,17 +171,15 @@ def coverage_stats(algo_ver):
     """Headline numbers for the page header: how much of the public library
     is fingerprinted, and when it was last touched."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM media.media WHERE NOT is_private")
-        total = cur.fetchone()[0]
-        cur.execute(
+        total = conn.execute(
+            "SELECT COUNT(*) FROM media.media WHERE NOT is_private").fetchone()[0]
+        hashed, failed, last = conn.execute(
             "SELECT COUNT(*) FILTER (WHERE mm.error IS NULL), "
             "       COUNT(*) FILTER (WHERE mm.error IS NOT NULL), "
             "       MAX(mm.hashed_at) "
             "FROM media.media_hash_meta mm "
             "JOIN media.media m ON m.id = mm.media_id "
-            "WHERE NOT m.is_private AND mm.algo_ver = %s", (algo_ver,))
-        hashed, failed, last = cur.fetchone()
+            "WHERE NOT m.is_private AND mm.algo_ver = %s", (algo_ver,)).fetchone()
     return {
         'total': total,
         'hashed': hashed or 0,
@@ -204,14 +192,12 @@ def coverage_stats(algo_ver):
 def fetch_hash_errors(algo_ver, limit=200):
     """Media that could not be fingerprinted, for the diagnostics table."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT mm.media_id, m.filepath, mm.ftype, mm.error, mm.hashed_at "
             "FROM media.media_hash_meta mm "
             "JOIN media.media m ON m.id = mm.media_id "
             "WHERE mm.error IS NOT NULL AND mm.algo_ver = %s AND NOT m.is_private "
-            "ORDER BY mm.media_id LIMIT %s", (algo_ver, limit))
-        return cur.fetchall()
+            "ORDER BY mm.media_id LIMIT %s", (algo_ver, limit)).fetchall()
 
 
 # ── Dismissed pairs ────────────────────────────────────────────────────────
@@ -224,63 +210,53 @@ def dismiss_pairs(pairs, user_id):
     rows = {_ordered(int(a), int(b)) for a, b in pairs if int(a) != int(b)}
     if not rows:
         return 0
+    added = 0
     with db_conn() as conn:
-        cur = conn.cursor()
-        added = 0
         for a, b in sorted(rows):
-            cur.execute(
+            added += conn.execute(
                 "INSERT INTO media.dupe_dismissed (a_id, b_id, dismissed_by, dismissed_at) "
                 "VALUES (%s,%s,%s,%s) ON CONFLICT (a_id, b_id) DO NOTHING",
-                (a, b, user_id, db_now()))
-            added += cur.rowcount
-        conn.commit()
-        return added
+                (a, b, user_id, db_now())).rowcount
+    return added
 
 
 def undismiss_pairs(pairs):
     rows = {_ordered(int(a), int(b)) for a, b in pairs}
     if not rows:
         return 0
+    removed = 0
     with db_conn() as conn:
-        cur = conn.cursor()
-        removed = 0
         for a, b in rows:
-            cur.execute(
+            removed += conn.execute(
                 "DELETE FROM media.dupe_dismissed WHERE a_id=%s AND b_id=%s",
-                (a, b))
-            removed += cur.rowcount
-        conn.commit()
-        return removed
+                (a, b)).rowcount
+    return removed
 
 
 def fetch_dismissed_pairs():
     """{(a_id, b_id)} with a_id < b_id — consulted by every grouping run."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT a_id, b_id FROM media.dupe_dismissed")
-        return {(a, b) for a, b in cur.fetchall()}
+        rows = conn.execute("SELECT a_id, b_id FROM media.dupe_dismissed").fetchall()
+    return {(a, b) for a, b in rows}
 
 
 def fetch_dismissed_detail(limit=500):
     """Dismissed pairs with both filenames, for the review table."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT d.a_id, d.b_id, ma.filepath, mb.filepath, "
             "       d.dismissed_at, u.username "
             "FROM media.dupe_dismissed d "
             "LEFT JOIN media.media ma ON ma.id = d.a_id "
             "LEFT JOIN media.media mb ON mb.id = d.b_id "
             "LEFT JOIN users.users u ON u.id = d.dismissed_by "
-            "ORDER BY d.dismissed_at DESC NULLS LAST LIMIT %s", (limit,))
-        return cur.fetchall()
+            "ORDER BY d.dismissed_at DESC NULLS LAST LIMIT %s", (limit,)).fetchall()
 
 
 # ── Quarantine (step one of the two-step resolve) ──────────────────────────
 def add_quarantine(media_id, keeper_id, distance, user_id, tags_backup):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        cur = conn.execute(
             "INSERT INTO media.dupe_quarantine "
             "(media_id, keeper_id, distance, marked_by, marked_at, tags_backup) "
             "VALUES (%s,%s,%s,%s,%s,%s) "
@@ -288,23 +264,20 @@ def add_quarantine(media_id, keeper_id, distance, user_id, tags_backup):
             "keeper_id=EXCLUDED.keeper_id, distance=EXCLUDED.distance, "
             "marked_by=EXCLUDED.marked_by, marked_at=EXCLUDED.marked_at",
             (media_id, keeper_id, distance, user_id, db_now(), tags_backup))
-        conn.commit()
         return cur.rowcount > 0
 
 
 def quarantined_ids():
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT media_id FROM media.dupe_quarantine")
-        return {r[0] for r in cur.fetchall()}
+        rows = conn.execute("SELECT media_id FROM media.dupe_quarantine").fetchall()
+    return {r[0] for r in rows}
 
 
 def fetch_quarantine():
     """Full review list: (media_id, filepath, thumb, tags, uploader,
     keeper_id, distance, marked_at, marked_by_name, bytes)."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT q.media_id, m.filepath, m.thumb, m.tags, "
             "       owner.username, q.keeper_id, q.distance, q.marked_at, "
             "       marker.username, mm.bytes "
@@ -313,46 +286,37 @@ def fetch_quarantine():
             "LEFT JOIN users.users owner ON owner.id = m.uploaded_by "
             "LEFT JOIN users.users marker ON marker.id = q.marked_by "
             "LEFT JOIN media.media_hash_meta mm ON mm.media_id = q.media_id "
-            "ORDER BY q.marked_at DESC, q.media_id")
-        return cur.fetchall()
+            "ORDER BY q.marked_at DESC, q.media_id").fetchall()
 
 
 def fetch_quarantine_rows(ids=None):
     """(media_id, tags_backup, keeper_id) for the given ids, or all."""
+    if ids is not None and not ids:
+        return []
+    sql = "SELECT media_id, tags_backup, keeper_id FROM media.dupe_quarantine"
     with db_conn() as conn:
-        cur = conn.cursor()
         if ids is None:
-            cur.execute(
-                "SELECT media_id, tags_backup, keeper_id FROM media.dupe_quarantine")
-        else:
-            if not ids:
-                return []
-            cur.execute(
-                "SELECT media_id, tags_backup, keeper_id FROM media.dupe_quarantine "
-                "WHERE media_id = ANY(%s)", (list(ids),))
-        return cur.fetchall()
+            return conn.execute(sql).fetchall()
+        return conn.execute(sql + " WHERE media_id = ANY(%s)",
+                            (list(ids),)).fetchall()
 
 
 def remove_quarantine(ids):
     if not ids:
         return 0
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM media.dupe_quarantine WHERE media_id = ANY(%s)",
-                    (list(ids),))
-        conn.commit()
-        return cur.rowcount
+        return conn.execute(
+            "DELETE FROM media.dupe_quarantine WHERE media_id = ANY(%s)",
+            (list(ids),)).rowcount
 
 
 def quarantine_summary():
     """(count, total bytes) for the purge confirmation."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "SELECT COUNT(*), COALESCE(SUM(mm.bytes), 0) "
             "FROM media.dupe_quarantine q "
-            "LEFT JOIN media.media_hash_meta mm ON mm.media_id = q.media_id")
-        return cur.fetchone()
+            "LEFT JOIN media.media_hash_meta mm ON mm.media_id = q.media_id").fetchone()
 
 
 # ── Scan job ───────────────────────────────────────────────────────────────
@@ -374,16 +338,13 @@ def claim_job(params, total, user_id):
     from psycopg import errors
     try:
         with db_conn() as conn:
-            cur = conn.cursor()
-            cur.execute(
+            row = conn.execute(
                 "INSERT INTO media.dupe_job "
                 "(state, params, total, started_by, started_at, heartbeat) "
                 "SELECT 'running', %s, %s, %s, %s, %s "
                 "WHERE NOT EXISTS (SELECT 1 FROM media.dupe_job WHERE state='running') "
                 "RETURNING id",
-                (params, total, user_id, db_now(), db_now()))
-            row = cur.fetchone()
-            conn.commit()
+                (params, total, user_id, db_now(), db_now())).fetchone()
             return row[0] if row else None
     except errors.UniqueViolation:
         return None
@@ -393,35 +354,28 @@ def update_job_progress(job_id, processed, hashed, skipped, failed):
     """Write counters and heartbeat; returns True while the job should keep
     running (i.e. no cancel was requested and the row is still 'running')."""
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        row = conn.execute(
             "UPDATE media.dupe_job SET processed=%s, hashed=%s, skipped=%s, "
             "failed=%s, heartbeat=%s WHERE id=%s "
             "RETURNING cancel_requested, state",
-            (processed, hashed, skipped, failed, db_now(), job_id))
-        row = cur.fetchone()
-        conn.commit()
+            (processed, hashed, skipped, failed, db_now(), job_id)).fetchone()
     return bool(row) and not row[0] and row[1] == 'running'
 
 
 def finish_job(job_id, state, error=None):
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        cur = conn.execute(
             "UPDATE media.dupe_job SET state=%s, error=%s, finished_at=%s, "
             "heartbeat=%s WHERE id=%s",
             (state, (error or None) and str(error)[:500], db_now(), db_now(),
              job_id))
-        conn.commit()
         return cur.rowcount > 0
 
 
 def request_cancel():
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        cur = conn.execute(
             "UPDATE media.dupe_job SET cancel_requested=true WHERE state='running'")
-        conn.commit()
         return cur.rowcount > 0
 
 
@@ -433,13 +387,10 @@ def finish_unresponsive_job(max_age, state, error):
     request itself ends the job rather than leaving the slot held.
     """
     with db_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
+        return conn.execute(
             "UPDATE media.dupe_job SET state=%s, error=%s, finished_at=%s "
             "WHERE state='running' AND (heartbeat IS NULL OR heartbeat < %s)",
-            (state, error, db_now(), db_now() - max_age))
-        conn.commit()
-        return cur.rowcount
+            (state, error, db_now(), db_now() - max_age)).rowcount
 
 
 def fetch_running_job():
