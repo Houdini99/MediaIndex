@@ -6,11 +6,22 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Upgrading
+## [1.2.0] — 2026-11-20
 
-- Rebuild the bot images with `./build.sh`. Optionally add
-  `DISCORD_ALBUM_MAX_FILES` and `TELEGRAM_ALBUM_MAX_FILES` to your compose
-  file (both default to 20).
+Both bots can now download from Bunkr, single files and whole albums.
+Before, a Bunkr link was indexed as a broken video: the bots saved the
+site's web page under the video's name. A link that answers with a web
+page instead of a file is now refused on every site. In Discord, an
+album reports into one status message instead of a line per file, and in
+Telegram, a reply to the tag prompt tags everything the prompt asked
+about.
+
+### Upgrading from 1.1.0
+
+- Rebuild the bot images with `./build.sh`. Only the bots changed: the
+  web app image and the database are untouched.
+- Optional: add `DISCORD_ALBUM_MAX_FILES` and `TELEGRAM_ALBUM_MAX_FILES`
+  to your compose file (both default to 20).
 
 ### Added
 
@@ -291,6 +302,7 @@ a network folder, Discord and Telegram.
 
 See [Security model](docs/security.md#known-limitations) for details.
 
-[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Houdini99/MediaIndex/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Houdini99/MediaIndex/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Houdini99/MediaIndex/releases/tag/v1.0.0
