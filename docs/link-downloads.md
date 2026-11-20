@@ -9,6 +9,7 @@ settings, see [Configuration](configuration.md#discord-bot-discord-bot).
 
 - [How a link is handled](#how-a-link-is-handled)
 - [Video sites (yt-dlp)](#video-sites-yt-dlp)
+- [Bunkr](#bunkr)
 - [Site logins](#site-logins)
 - [YouTube PO tokens](#youtube-po-tokens)
 - [Limits](#limits)
@@ -18,7 +19,11 @@ settings, see [Configuration](configuration.md#discord-bot-discord-bot).
 ## How a link is handled
 
 1. **A link that names a media file** (`…/cat.gif`, or a
-   `…?format=jpg`-style link) is downloaded directly.
+   `…?format=jpg`-style link) is downloaded directly. If it answers with a
+   web page instead of the file, it is refused rather than indexed as a
+   broken file. [Bunkr](#bunkr) links are the exception: they are pages,
+   and the bots fetch the file behind them. A Bunkr album link becomes one
+   download per file.
 2. **A link a yt-dlp extractor claims** (YouTube, TikTok, Reddit, X and the
    other sites yt-dlp supports) is downloaded with yt-dlp.
 3. **Any other link** is asked what it serves, with one `HEAD` request, the
@@ -26,6 +31,7 @@ settings, see [Configuration](configuration.md#discord-bot-discord-bot).
    type the index accepts, it is downloaded directly, under the filename the
    server offers if it offers one. This is how CDN links such as
    `https://files.example/ab/cd/<md5>`, which name no file, are recognised.
+   A Bunkr link that names no file is asked through Bunkr's API instead.
    At most 4 links per message are asked, each with a 15-second timeout.
 4. **What is left**:
    - The **Discord bot** checks the page for a video with yt-dlp's generic
@@ -59,6 +65,51 @@ in Discord or a reply in Telegram.
 
 The bot images install the newest yt-dlp when they are built; run
 `./build.sh` again to update it.
+
+## Bunkr
+
+yt-dlp has no Bunkr support, so the bots handle Bunkr themselves
+(`bots_common/bunkr.py`). A Bunkr link is a page, even when it ends in
+`.mp4`, and the file behind it needs a download token that expires after a
+few hours. The bots get the file the way the page's Download button does:
+
+1. The page gives the file's id and the address of Bunkr's signing service.
+2. Bunkr's API gives the file's address on its CDN and its original name.
+3. The signing service adds a fresh token to that address.
+
+This runs right before every download, so a Telegram link waiting for its
+tags, or a Discord retry hours later, still gets a working token. File
+pages (`/f/…`, and the older `/v/…` and `/i/…`) and the Download button's
+own link (`dl.bunkr…/file/<id>`) work on any Bunkr domain. Each file counts
+against the direct-link limit (`*_LINK_MAX_MB`), and every request is
+checked like any other download (see
+[Which addresses are fetched](#which-addresses-are-fetched)).
+
+### Albums
+
+An album link (`/a/…`) is read once, with one request for its list of
+files, and each image or video in it is then downloaded as above, as if
+its link had been sent on its own. The tags in the message apply to every
+file.
+
+- Files are taken in album order, up to `*_ALBUM_MAX_FILES` per album
+  (20 by default). `0` turns albums off.
+- Files the index doesn't take (archives, documents) are skipped.
+- When files are left out, the bot says so, naming the album and how
+  many files it took. In Discord this is the top of the album's one
+  status message, which then lists each file as it is done (see
+  [Discord bot](discord-bot.md#reactions-and-the-bot-logs-channel)); in
+  Telegram it is a reply.
+- An album that can't be read, or holds nothing the index takes, is
+  answered with a 🚫 and the reason.
+- At most 4 albums per message are read.
+- In Telegram, an album sent without tags waits for them like any other
+  link, one waiting item per file. Replying to the bot's "send tags"
+  prompt tags the whole album.
+
+Bunkr changes its pages every few months. When it does, the link is
+answered with a 🚫 or a reply saying the page could not be read, and the
+container log has a `bunkr:` line naming the step that failed.
 
 ## Site logins
 
@@ -113,6 +164,7 @@ startup line says whether PO tokens are on.
 | Limit | Discord | Telegram |
 |---|---|---|
 | Direct file links | `DISCORD_LINK_MAX_MB` (512 MB) | `TELEGRAM_LINK_MAX_MB` (512 MB) |
+| Files per Bunkr album | `DISCORD_ALBUM_MAX_FILES` (20) | `TELEGRAM_ALBUM_MAX_FILES` (20) |
 | yt-dlp downloads | `DISCORD_YTDLP_MAX_MB` (512 MB) | `TELEGRAM_YTDLP_MAX_MB` (512 MB) |
 | No progress for | `DISCORD_YTDLP_STALL_TIMEOUT` (120 s) | `TELEGRAM_YTDLP_STALL_TIMEOUT` (120 s) |
 | Not downloading yet after | `DISCORD_YTDLP_MAX_DURATION` (1800 s) | `TELEGRAM_YTDLP_MAX_DURATION` (1800 s) |

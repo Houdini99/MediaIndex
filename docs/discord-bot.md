@@ -111,7 +111,8 @@ The bot reads messages in the ingest channel from members holding
 
 - **attachments**, including in forwarded messages;
 - **links in the text** — see [Link downloads](link-downloads.md) for how
-  a link becomes a file, including video sites through yt-dlp;
+  a link becomes a file, including video sites through yt-dlp and Bunkr
+  files and albums;
 - **media behind embeds**, such as GIFs from Discord's GIF picker and
   image links Discord previews. If an embed isn't there yet, the bot looks
   at the message once more a few seconds later.
@@ -178,6 +179,15 @@ delay and attempt number. A duplicate line links the item it duplicates,
 with its owner and tags, unless that item is someone's private media, in
 which case it only says so. The channel also gets a status line when the
 bot starts.
+
+A [Bunkr album](link-downloads.md#albums) gets one message instead of a
+line per file. Its top says who the files were indexed for and under
+which tags, and what was left out of the album; below that is one line
+per file (✅, ♻️, 🚫 or ❌), added by editing the message as each file is
+done, with a ⬇️ progress count while the album runs. When the next line
+would push the message past Discord's 2000-character limit, the album
+carries on in a new message marked *(continued)*. In a DM, the same
+message goes into the DM.
 
 ## Retries
 

@@ -207,6 +207,9 @@ services:
       # Size cap (MB) for a file downloaded from a link or embed. Attachments
       # are bounded by Discord's own upload limit instead.
       - DISCORD_LINK_MAX_MB=${DISCORD_LINK_MAX_MB:-512}
+      # Files taken from one Bunkr album link, in album order (images and
+      # videos only, each within DISCORD_LINK_MAX_MB). 0 turns albums off.
+      - DISCORD_ALBUM_MAX_FILES=${DISCORD_ALBUM_MAX_FILES:-20}
       # Optional bot-logs channel: status lines for startup, each ingest
       # result, tag matches, and failures. Empty = disabled.
       - DISCORD_LOG_CHANNEL_ID=${DISCORD_LOG_CHANNEL_ID:-}
@@ -408,6 +411,8 @@ services:
       # keeps direct file links and drops the resolver.
       - TELEGRAM_LINKS=${TELEGRAM_LINKS:-true}
       - TELEGRAM_LINK_MAX_MB=${TELEGRAM_LINK_MAX_MB:-512}
+      # Files taken from one Bunkr album link (see discord-bot). 0 = off.
+      - TELEGRAM_ALBUM_MAX_FILES=${TELEGRAM_ALBUM_MAX_FILES:-20}
       - TELEGRAM_YTDLP=${TELEGRAM_YTDLP:-true}
       - TELEGRAM_YTDLP_MAX_MB=${TELEGRAM_YTDLP_MAX_MB:-512}
       - TELEGRAM_YTDLP_STALL_TIMEOUT=${TELEGRAM_YTDLP_STALL_TIMEOUT:-120}

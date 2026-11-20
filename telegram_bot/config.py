@@ -93,6 +93,9 @@ LINKS_ENABLED = env.flag('TELEGRAM_LINKS', True)
 # Cap on a direct media-link download. Checked against Content-Length up
 # front and against the running total during the transfer.
 LINK_MAX_BYTES = int(env.num('TELEGRAM_LINK_MAX_MB', 512) * 1e6)
+# Files taken from one Bunkr album link, in album order (images and videos
+# only; each still counts against TELEGRAM_LINK_MAX_MB). 0 turns albums off.
+ALBUM_MAX_FILES = max(0, env.num('TELEGRAM_ALBUM_MAX_FILES', 20, int))
 # yt-dlp resolver for platform links (YouTube, TikTok, …): the
 # TELEGRAM_YTDLP* variables, read and documented in bots_common/env.py.
 _ytdlp = env.ytdlp_settings('TELEGRAM')

@@ -104,6 +104,7 @@ See [Discord bot](discord-bot.md) for what each feature does, and
 | `DISCORD_LOOKUP_TTL` | no | `60` | Seconds the bot caches which index account a Discord user is linked to. |
 | `DISCORD_FORWARD_TAG_WAIT` | no | `15` | Seconds an untagged forward waits for a follow-up message with its tags. `0` doesn't wait. |
 | `DISCORD_LINK_MAX_MB` | no | `512` | Size limit for a file downloaded from a link or an embed, in MB. Attachments are limited by Discord's own upload limit instead. |
+| `DISCORD_ALBUM_MAX_FILES` | no | `20` | Files taken from one [Bunkr album](link-downloads.md#bunkr) link, in album order. `0` turns albums off. |
 | `DISCORD_LOG_CHANNEL_ID` | no | — | Channel for status lines (startup, each ingest result, failures). Unset turns it off; a value that is not a number stops the bot at startup. |
 | `DISCORD_NOTIFY_THUMBNAIL_ONLY` | no | `false` | `true` always attaches the thumbnail to an announcement, never the original file. |
 
@@ -174,6 +175,7 @@ See [Telegram bot](telegram-bot.md) and [Link downloads](link-downloads.md).
 |---|---|---|---|
 | `TELEGRAM_LINKS` | no | `true` | Download links sent to the bot. `false` ignores links. |
 | `TELEGRAM_LINK_MAX_MB` | no | `512` | Size limit for a link that points straight at a file, in MB. |
+| `TELEGRAM_ALBUM_MAX_FILES` | no | `20` | Files taken from one [Bunkr album](link-downloads.md#bunkr) link, in album order. `0` turns albums off. |
 | `TELEGRAM_YTDLP` | no | `true` | Download links to video sites with yt-dlp. `false` keeps direct file links working. |
 | `TELEGRAM_YTDLP_MAX_MB` | no | `512` | Size limit for one downloaded video, in MB. |
 | `TELEGRAM_YTDLP_QUALITY` | no | `1080` | Highest resolution: `best`, `2160`, `1440`, `1080`, `720` or `480`. |

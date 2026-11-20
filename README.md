@@ -46,7 +46,8 @@ what this means for security.
   tagging queue, a **Discord bot** and a **Telegram bot**.
 - **Link downloads:** send a bot a link to YouTube, TikTok, Reddit, X or
   any other site yt-dlp supports, and the video lands in your index, with
-  stored site logins and YouTube PO tokens when a site needs them.
+  stored site logins and YouTube PO tokens when a site needs them. Bunkr
+  files and albums work too.
 - **Duplicate detection:** identical files are rejected on upload, and a
   perceptual-hash scanner finds near-duplicates, including re-encoded
   videos, with a reversible quarantine.

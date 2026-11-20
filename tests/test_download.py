@@ -23,7 +23,7 @@ import aiohttp
 import pytest
 
 from bots_common import sniff
-from bots_common.download import TooLarge
+from bots_common.download import NotAFile, TooLarge
 from discord_bot import config, download
 
 
@@ -153,6 +153,22 @@ def test_stream_raises_on_http_error(tmp_path):
 
     with pytest.raises(aiohttp.ClientResponseError):
         run(_dl(session).stream(CDN, str(tmp_path / 'x'), 'clip.mp4'))
+
+
+@pytest.mark.parametrize('ctype', ['text/html', 'text/html; charset=utf-8',
+                                   'application/xhtml+xml'])
+def test_a_web_page_is_never_saved_as_the_file(tmp_path, ctype):
+    """A link can end in .mp4 and still answer with a file host's viewer
+    page (bunkr.cr did). Saved, the index would take 40 KB of HTML for a
+    broken video."""
+    dst = tmp_path / 'out.mp4'
+    session = FakeSession(get=[FakeResponse(chunks=[b'<html>'],
+                                            headers={'Content-Type': ctype})])
+
+    with pytest.raises(NotAFile):
+        run(_dl(session).stream(ELSEWHERE, str(dst), 'clip.mp4'))
+
+    assert not dst.exists()
 
 
 # ── stream: public addresses only, links capped ───────────────────────────

@@ -357,10 +357,12 @@ class IndexBot:
         # everything. Order matters: a reply is the more specific
         # intent, so it must be tested first.
         if message.reply_to_message:
-            entry = await self._take_by_reply(
+            entries = await self._take_by_reply(
                 user.id, message.reply_to_message.message_id)
-            if entry:
-                await self._ingest_entry(message, entry, tags, owner, context)
+            if entries:
+                for entry in entries:
+                    await self._ingest_entry(message, entry, tags, owner,
+                                             context)
                 return
             # Replying to something we aren't holding is not an error —
             # fall through and treat it as a plain tag message.
@@ -372,7 +374,7 @@ class IndexBot:
             await self._ingest_entry(message, entry, tags, owner, context)
 
     async def _take_by_reply(self, user_id, reply_message_id):
-        """The waiting entry a reply refers to, removed from the store.
+        """The waiting entries a reply refers to, removed from the store.
 
         A user may reply either to their own media message or to the
         bot's "send tags" prompt, and both are natural — so both are
@@ -380,16 +382,23 @@ class IndexBot:
         keyed by the message it arrived on; the scan covers the two that
         are not — a reply to the prompt, and a link, which is keyed
         per-URL because one message can carry several.
+
+        The scan takes every entry it matches, not the first: one prompt
+        asks about a whole photo album, every link in a message or every
+        file of a Bunkr album, and says "reply to tag only these".
         """
         entry = await self.store.take(user_id, reply_message_id)
         if entry:
-            return entry
+            return [entry]
+        taken = []
         for candidate in await self.store.list(user_id):
             if reply_message_id in (candidate.get('prompt_message_id'),
                                     candidate.get('message_id')):
-                return await self.store.take(
+                entry = await self.store.take(
                     user_id, candidate.get('key') or candidate['message_id'])
-        return None
+                if entry:
+                    taken.append(entry)
+        return taken
 
     async def _ingest_entry(self, message, entry, tags, owner, context):
         await self._ingest(message, _Item.from_entry(entry), tags, owner,
@@ -411,8 +420,10 @@ class IndexBot:
         exactly as a photo is. Nothing is fetched until the tags exist:
         what is parked is the URL, never the bytes.
         """
-        items = await self._link_items(message, urls)
+        items, answered = await self._link_items(message, urls)
         if not items:
+            if set(urls) <= answered:
+                return          # every link already has its own answer
             extra = ("" if self._resolver_enabled() else
                      "\n\n(The link resolver is unavailable on this "
                      "deployment, so only direct file links work.)")
@@ -428,7 +439,10 @@ class IndexBot:
 
     async def _link_items(self, message, urls):
         """The links in one message the bot can actually fetch, in the
-        order they were sent.
+        order they were sent, and the links already answered on the way
+        (a Bunkr album nothing comes of).
+
+        A Bunkr album becomes one item per file (see _read_albums).
 
         A URL that already names a media file is a plain download. Every
         other one is offered to yt-dlp's extractor list; the generic
@@ -440,9 +454,10 @@ class IndexBot:
         is refused here rather than fetched blind.
         """
         urls = list(dict.fromkeys(urls))
+        albums = await self._read_albums(message, urls)
         names = {url: parsing.media_url_info(url, config.ALLOWED_EXT)
                  for url in urls}
-        pages = [url for url in urls if not names[url]]
+        pages = [url for url in urls if not names[url] and url not in albums]
         resolvable = set()
         if pages and self._resolver_enabled():
             # The first call compiles every extractor's URL regex (~2000
@@ -454,6 +469,14 @@ class IndexBot:
             unclaimed, config.ALLOWED_EXT) if unclaimed else {}
         items = []
         for n, url in enumerate(urls):
+            if url in albums:
+                # Keyed per file: one album parks many items.
+                items.extend(
+                    _Item(None, name, parsing.file_ext(name), 0,
+                          message.message_id, None, url=link,
+                          key=f"{message.message_id}#{n}.{i}")
+                    for i, (link, name) in enumerate(albums[url].files))
+                continue
             fetch_url, name = served.get(url, (url, names[url]))
             if not name and url not in resolvable:
                 logging.info("links: nothing ingestible behind %s", url)
@@ -461,7 +484,31 @@ class IndexBot:
             items.append(_Item(None, name or url, parsing.file_ext(name), 0,
                                message.message_id, None, url=fetch_url,
                                key=f"{message.message_id}#{n}"))
-        return items
+        return items, {url for url, album in albums.items()
+                       if not album.files}
+
+    async def _read_albums(self, message, urls):
+        """{url: bunkr.Album} for the Bunkr albums among `urls`, each read
+        into the files it holds (at most TELEGRAM_ALBUM_MAX_FILES of them).
+
+        Reading an album is one request for its file list, not a download,
+        so it happens before the tags are asked for — the prompt can then
+        say how many files are waiting. What an album leaves out is said
+        here, and so is why nothing comes of one; yt-dlp has no Bunkr
+        support, so no later path could do better with the link.
+        """
+        if not config.ALBUM_MAX_FILES:
+            return {}
+        albums = await self.downloads.read_albums(
+            urls, config.ALLOWED_EXT, config.ALBUM_MAX_FILES)
+        for url, album in albums.items():
+            note = album.note()
+            if note:
+                icon = '📚' if album.files else '🚫'
+                await self._reply(
+                    message, f"{icon} {html.escape(url, quote=False)} — "
+                             f"{html.escape(note, quote=False)}.")
+        return albums
 
     async def _fetch_link(self, message, item, label):
         """Download what a link points at, or None once the failure has
@@ -515,6 +562,11 @@ class IndexBot:
             size = f" ({e.size / 1e6:.0f} MB)" if e.size else ""
             await self._reply(
                 message, f"🚫 {label}{size} is over the {cap} link limit.")
+            return None
+        except download.NotAFile as e:
+            self._discard(tmp)
+            await self._reply(
+                message, f"🚫 {label} — {html.escape(str(e), quote=False)}.")
             return None
         except aiohttp.ClientResponseError as e:
             logging.warning("links: %s returned HTTP %s", item.url, e.status)

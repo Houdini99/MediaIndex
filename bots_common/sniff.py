@@ -10,8 +10,8 @@ file has neither of. Discord's own unfurler simply asks the
 server, and so does this: one HEAD request, and the Content-Type (plus
 the filename in Content-Disposition, when there is one) decides.
 
-Both bots use it (sniff_many, at most MAX_PER_MESSAGE links each time).
-That makes a bot request a URL it was handed, from inside the stack's
+Both bots use it (download.Downloader.sniff_links, at most
+MAX_PER_MESSAGE links each time). That makes a bot request a URL it was handed, from inside the stack's
 networks, so every hop goes through require_public first — the same bar
 bots_common/download.py sets on every download.
 """
@@ -176,11 +176,3 @@ async def sniff(session, url, allowed_ext):
         logging.info("sniff: %s failed — %s", url, type(e).__name__)
     return None
 
-
-async def sniff_many(session, urls, allowed_ext):
-    """{url: (fetch_url, filename)} for those of the first MAX_PER_MESSAGE
-    distinct `urls` that serve media, asked in parallel."""
-    urls = list(dict.fromkeys(urls))[:MAX_PER_MESSAGE]
-    found = await asyncio.gather(*(sniff(session, url, allowed_ext)
-                                   for url in urls))
-    return {url: hit for url, hit in zip(urls, found) if hit}

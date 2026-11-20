@@ -84,8 +84,9 @@ is not. `TELEGRAM_INGEST_TAGS` (`telegram`) is added to everything.
 **Nothing untagged is indexed.** Media sent without tags is held, and the
 bot asks for them. Then either:
 
-- **reply** to the item (or to the bot's question) with tags, to tag just
-  that item; or
+- **reply** with tags to the item, to tag just that item, or to the bot's
+  question, to tag everything that question asked about (a photo album,
+  the links in one message, a Bunkr album); or
 - **send a tag list** on its own, to tag everything you have waiting. Send
   ten photos, then type `holiday,beach`.
 
@@ -105,7 +106,8 @@ are announced in Discord like any other upload; private ones are not.
 ## Links
 
 Send a link, and the bot downloads what it points at: directly for a link
-to a file, through yt-dlp for video sites. [Link
+to a file, through yt-dlp for video sites, and file by file for a
+[Bunkr](link-downloads.md#bunkr) file or album. [Link
 downloads](link-downloads.md) describes how links are handled, logged in
 and limited. A page that no yt-dlp extractor recognises and that doesn't
 serve a file is refused.

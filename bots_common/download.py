@@ -17,18 +17,29 @@ They share how that fetch is made —
     byte is written, and the running total is checked again during the
     transfer: a chunked response carries no length to trust, and the
     sender chooses the URL.
+  * **A file, not a page.** A link can end in `.mp4` and still answer
+    with a web page (a file host's viewer, a login wall). An HTML answer
+    is refused rather than saved under the video's name.
+  * **Hosts that sign their files.** A Bunkr link is a page whose file
+    needs a fresh token; fetch() asks for one right before the transfer
+    (bots_common/bunkr.py). A Bunkr album is read into its files' links
+    first (Downloader.read_albums).
 
 — and the Downloader that owns the session both use. Each bot subclasses
 it with what it does around the fetch (the Discord bot re-signs an
 expired CDN link and tries once more).
 """
+import asyncio
 import logging
 import time
 
 import aiohttp
 
-from . import parsing, sniff
+from . import bunkr, parsing, sniff
 from .resolver import PROGRESS_INTERVAL
+
+#: Content types that mean "you got the web page, not the file".
+_PAGE_TYPES = frozenset({'text/html', 'application/xhtml+xml'})
 
 
 class TooLarge(Exception):
@@ -38,6 +49,12 @@ class TooLarge(Exception):
     def __init__(self, size=None):
         super().__init__("the file is over the size limit")
         self.size = size
+
+
+class NotAFile(Exception):
+    """The link answered with a web page instead of the file it seemed to
+    name, or with a page the bot could not find the file on. The message
+    is shown to the sender."""
 
 
 class Downloader:
@@ -66,10 +83,37 @@ class Downloader:
             self._session = None
 
     async def sniff_links(self, urls, allowed_ext):
-        """{url: (fetch_url, filename)} for links that name no file but
-        serve one — one HEAD each, every hop past `require_public` first
-        (see bots_common/sniff.py)."""
-        return await sniff.sniff_many(self.session(), urls, allowed_ext)
+        """{url: (fetch_url, filename)} for the first sniff.MAX_PER_MESSAGE
+        distinct `urls` that name no file but serve one, asked in
+        parallel — one HEAD each, every hop past `require_public` first
+        (see bots_common/sniff.py).
+
+        A Bunkr link is asked through Bunkr's own API instead, since a HEAD
+        only ever finds its page, and keeps the link as the URL to fetch:
+        its file needs a token minted at download time (see fetch)."""
+        urls = list(dict.fromkeys(urls))[:sniff.MAX_PER_MESSAGE]
+        session = self.session()
+        found = await asyncio.gather(*(
+            (bunkr.sniff_link if bunkr.is_file_link(url) else sniff.sniff)(
+                session, url, allowed_ext)
+            for url in urls))
+        return {url: hit for url, hit in zip(urls, found) if hit}
+
+    async def read_albums(self, urls, allowed_ext, limit):
+        """{url: bunkr.Album} for the Bunkr album links among `urls` — the
+        first sniff.MAX_PER_MESSAGE distinct ones, read in parallel, one
+        request each. An album's files are ordinary Bunkr file links, so
+        they download through fetch like any other link; `limit` caps how
+        many are taken from each album."""
+        albums = [url for url in dict.fromkeys(urls)
+                  if bunkr.is_album_link(url)][:sniff.MAX_PER_MESSAGE]
+        if not albums:
+            return {}
+        session = self.session()
+        found = await asyncio.gather(*(
+            bunkr.read_album(session, url, allowed_ext, limit)
+            for url in albums))
+        return dict(zip(albums, found))
 
 
 async def fetch(session, url, dst, label, max_bytes=None):
@@ -77,10 +121,18 @@ async def fetch(session, url, dst, label, max_bytes=None):
     means no cap). `dst` is reopened each call, so a retry cleanly
     overwrites a partial first attempt.
 
+    A Bunkr link is swapped for a freshly signed link to its file first.
+
     Raises Blocked for a URL that is not on the public internet, TooLarge
-    for an oversized file, and aiohttp's own errors (ClientResponseError
-    for an error status) for everything else.
+    for an oversized file, NotAFile for a web page where the file should
+    be, and aiohttp's own errors (ClientResponseError for an error status)
+    for everything else.
     """
+    if bunkr.is_file_link(url):
+        try:
+            url = await bunkr.file_url(session, url)
+        except bunkr.Unreadable as e:
+            raise NotAFile(str(e)) from e
     async with sniff.follow_public(session, 'GET', url) as (_, resp):
         await _stream(resp, dst, label, max_bytes)
 
@@ -90,6 +142,11 @@ async def _stream(resp, dst, label, max_bytes):
     seconds so a big download never looks like a hang; quick ones stay
     silent."""
     resp.raise_for_status()
+    ctype = (resp.headers.get('Content-Type') or '').split(';')[0]
+    if ctype.strip().lower() in _PAGE_TYPES:
+        logging.info("download: %s — the link answered with a web page (%s)",
+                     label, ctype)
+        raise NotAFile("that link opens a web page, not the file itself")
     total = resp.content_length
     if max_bytes and total and total > max_bytes:
         # Declared too big: give up before writing anything.

@@ -22,7 +22,7 @@ import types
 
 import pytest
 
-from bots_common import resolver, site_logins, sniff
+from bots_common import bunkr, resolver, site_logins, sniff
 from bots_common.index_client import IndexUnavailable
 from telegram_bot import config, download
 from telegram_bot.bot import IndexBot
@@ -56,10 +56,16 @@ class FakeDownloader:
         self.calls = []
         self.sniffed = []
         self.served = {BARE_FILE: (BARE_FILE, '1234567 - tags.mp4')}
+        self.albums = {}           # url → bunkr.Album
+        self.album_reads = []
 
     async def sniff_links(self, urls, allowed_ext):
         self.sniffed.extend(urls)
         return {url: self.served[url] for url in urls if url in self.served}
+
+    async def read_albums(self, urls, allowed_ext, limit):
+        self.album_reads.append((list(urls), limit))
+        return {url: self.albums[url] for url in urls if url in self.albums}
 
     async def download(self, url, dst, label, max_bytes):
         self.calls.append({'url': url, 'dst': dst, 'max_bytes': max_bytes})
@@ -579,3 +585,126 @@ def test_a_refused_link_is_explained_to_the_sender(bot, ctx, ytdlp):
     send(bot, msg, ctx)
     assert bot.index.uploads == []
     assert 'not a public address' in replies(msg)
+
+
+def test_a_web_page_where_the_file_should_be_is_explained(bot, ctx, ytdlp):
+    bot.downloads.raises = download.NotAFile(
+        "that link opens a web page, not the file itself")
+    msg = link_message(f'cats {DIRECT_GIF}')
+    send(bot, msg, ctx)
+    assert bot.index.uploads == []
+    assert 'opens a web page' in replies(msg)
+
+
+def test_a_bunkr_link_is_handed_to_the_downloader_as_it_was_sent(bot, ctx,
+                                                                  ytdlp):
+    """Its .mp4 makes it a direct download, and it stays the page link:
+    the downloader's fetch turns it into a signed file link at download
+    time (bots_common/bunkr.py), so a link parked for tags never holds a
+    token that has expired by the time it is tagged."""
+    page = 'https://bunkr.cr/f/beach-day_source-Ab12Cd34.mp4'
+    msg = link_message(f'cats {page}')
+    send(bot, msg, ctx)
+    assert [c['url'] for c in bot.downloads.calls] == [page]
+    assert ytdlp.calls == []
+    assert len(bot.index.uploads) == 1
+
+
+# ── Bunkr albums ──────────────────────────────────────────────────────────
+ALBUM = 'https://bunkr.cr/a/Qw3rTy12'
+ALBUM_FILES = [('https://bunkr.cr/f/a-Q.jpg', 'a.jpg'),
+               ('https://bunkr.cr/f/b-Q.mp4', 'b.mp4'),
+               ('https://bunkr.cr/f/c-Q.jpg', 'c.jpg')]
+
+
+def _album(**kw):
+    return bunkr.Album(ALBUM, 'Holiday 2022', ALBUM_FILES, 3, **kw)
+
+
+def test_a_tagged_album_downloads_each_of_its_files(bot, ctx, ytdlp):
+    bot.downloads.albums[ALBUM] = _album()
+    msg = link_message(f'beach {ALBUM}')
+    send(bot, msg, ctx)
+    assert [c['url'] for c in bot.downloads.calls] == [
+        link for link, _ in ALBUM_FILES]
+    assert [u['filename'] for u in bot.index.uploads] == [
+        'a.jpg', 'b.mp4', 'c.jpg']
+    assert bot.downloads.album_reads == [([ALBUM], config.ALBUM_MAX_FILES)]
+    assert ytdlp.calls == []
+
+
+def test_an_untagged_album_parks_every_file_and_asks_once(bot, ctx, store,
+                                                          ytdlp):
+    user = FakeUser()
+    bot.downloads.albums[ALBUM] = _album()
+    msg = link_message(ALBUM, user=user)
+    send(bot, msg, ctx)
+    assert bot.downloads.calls == [], "nothing is fetched before the tags"
+    entries = run(store.list(user.id))
+    assert sorted(e['url'] for e in entries) == sorted(
+        link for link, _ in ALBUM_FILES)
+    assert len(msg.replies) == 1 and 'these 3 files' in msg.replies[0]
+
+
+def test_a_reply_to_an_albums_prompt_tags_the_whole_album(bot, ctx, store,
+                                                          ytdlp):
+    """The prompt says "reply to this message to tag only these" — so a
+    reply has to take all of them, not the first one it finds."""
+    user = FakeUser()
+    bot.downloads.albums[ALBUM] = _album()
+    send(bot, link_message(ALBUM, user=user), ctx)
+    send(bot, link_message(DIRECT_GIF, user=user), ctx)
+    album_entry = next(e for e in run(store.list(user.id))
+                       if e['url'] != DIRECT_GIF)
+    prompt = FakeMessage(user=user)
+    prompt.message_id = album_entry['prompt_message_id']
+
+    send(bot, link_message('beach', user=user, reply_to=prompt), ctx)
+
+    assert len(bot.index.uploads) == 3
+    assert run(store.count(user.id)) == 1, "the other link still waits"
+
+
+def test_a_reply_to_the_prompt_tags_every_link_it_asked_about(bot, ctx,
+                                                              store, ytdlp):
+    user = FakeUser()
+    send(bot, link_message(f'{VIDEO_PAGE} {DIRECT_GIF}', user=user), ctx)
+    prompt = FakeMessage(user=user)
+    prompt.message_id = run(store.list(user.id))[0]['prompt_message_id']
+
+    send(bot, link_message('both', user=user, reply_to=prompt), ctx)
+
+    assert len(bot.index.uploads) == 2
+    assert run(store.count(user.id)) == 0
+
+
+def test_what_an_album_left_out_is_said(bot, ctx, ytdlp):
+    bot.downloads.albums[ALBUM] = _album(over_limit=40)
+    msg = link_message(f'beach {ALBUM}')
+    send(bot, msg, ctx)
+    assert any(r.startswith(f'📚 {ALBUM} — taking the first 3 of the 43')
+               for r in msg.replies)
+    assert len(bot.index.uploads) == 3
+
+
+def test_an_album_nothing_comes_of_is_answered_once(bot, ctx, store, ytdlp):
+    """Its own reason, and not the generic "can't download anything"
+    on top of it."""
+    bot.downloads.albums[ALBUM] = bunkr.Album(
+        ALBUM, reason='Bunkr answered HTTP 404 for that album')
+    msg = link_message(f'beach {ALBUM}')
+    send(bot, msg, ctx)
+    assert msg.replies == [
+        f'🚫 {ALBUM} — Bunkr answered HTTP 404 for that album.']
+    assert bot.downloads.calls == [] and bot.downloads.sniffed == []
+
+
+def test_albums_can_be_turned_off(bot, ctx, monkeypatch, ytdlp):
+    monkeypatch.setattr(config, 'ALBUM_MAX_FILES', 0)
+    bot.downloads.albums[ALBUM] = _album()
+    msg = link_message(f'beach {ALBUM}')
+    send(bot, msg, ctx)
+    assert bot.downloads.album_reads == []
+    assert bot.index.uploads == []
+    assert "can't download anything" in replies(msg)
+

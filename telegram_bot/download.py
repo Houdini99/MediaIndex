@@ -12,8 +12,9 @@ Discord's signed, expiring attachment host, so a 403/404 is simply a
 failure.
 """
 from bots_common.download import Downloader, fetch
-# Re-exported so the bot catches `download.Blocked` / `download.TooLarge`.
-from bots_common.download import TooLarge  # noqa: F401
+# Re-exported so the bot catches `download.Blocked` / `download.TooLarge`
+# / `download.NotAFile`.
+from bots_common.download import NotAFile, TooLarge  # noqa: F401
 from bots_common.sniff import Blocked  # noqa: F401
 
 
@@ -25,7 +26,8 @@ class LinkDownloader(Downloader):
         """Stream `url` to `dst`, refusing anything over `max_bytes`.
 
         Raises Blocked for a URL that is not on the public internet,
-        TooLarge for an oversized file, and aiohttp's own errors for
-        everything else; the caller turns all three into a reply.
+        TooLarge for an oversized file, NotAFile for a web page where the
+        file should be, and aiohttp's own errors for everything else; the
+        caller turns each into a reply.
         """
         await fetch(self.session(), url, dst, label, max_bytes)

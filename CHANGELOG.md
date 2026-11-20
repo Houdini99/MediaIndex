@@ -6,6 +6,39 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Upgrading
+
+- Rebuild the bot images with `./build.sh`. Optionally add
+  `DISCORD_ALBUM_MAX_FILES` and `TELEGRAM_ALBUM_MAX_FILES` to your compose
+  file (both default to 20).
+
+### Added
+
+- Both bots download Bunkr files. A Bunkr link is a page, even when it
+  ends in `.mp4`, so the bots used to index that page as a broken video.
+  They now ask Bunkr for the file the way its Download button does, with a
+  fresh download token right before each download. File pages (`/f/…`,
+  `/v/…`, `/i/…`) and Download links (`dl.bunkr…/file/<id>`) work on any
+  Bunkr domain. See [Link downloads](docs/link-downloads.md#bunkr).
+- Bunkr albums: an album link (`/a/…`) downloads the album's images and
+  videos, each as its own item, under the message's tags. New settings
+  `DISCORD_ALBUM_MAX_FILES` and `TELEGRAM_ALBUM_MAX_FILES` (default 20)
+  cap the files taken from one album; `0` turns albums off. When files are
+  left out, the bot says how many. See
+  [Link downloads](docs/link-downloads.md#albums).
+- Discord: an album's files report into one status message, edited as
+  each file is done, instead of posting a line per file. Who the files
+  were indexed for and their tags are said once at the top. A new message
+  starts only when the list would pass Discord's 2000-character limit.
+
+### Fixed
+
+- A direct file link that answers with a web page instead of the file is
+  refused with a 🚫 or a reply, instead of being indexed as a broken file.
+- Telegram: replying to the bot's "send tags" prompt now tags everything
+  that prompt asked about (a photo album, several links in one message).
+  It used to tag only one of them and leave the rest waiting.
+
 ## [1.1.0] — 2026-10-22
 
 A maintenance release from a full code audit. The Discord bot now checks

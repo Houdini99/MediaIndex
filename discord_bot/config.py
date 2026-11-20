@@ -92,6 +92,9 @@ EMBED_UNFURL_WAIT = 3.0
 # transfer. Attachments on Discord's own CDN are bounded by Discord's
 # upload limit instead.
 LINK_MAX_BYTES = int(env.num('DISCORD_LINK_MAX_MB', 512) * 1e6)
+# Files taken from one Bunkr album link, in album order (images and videos
+# only; each still counts against DISCORD_LINK_MAX_MB). 0 turns albums off.
+ALBUM_MAX_FILES = max(0, env.num('DISCORD_ALBUM_MAX_FILES', 20, int))
 # Backoff after a rejected app password: 10 failures within 15-minute
 # windows get the container's IP banned for 24h, so never retry hot. The
 # index client keeps this clock (bots_common/index_client.py), so

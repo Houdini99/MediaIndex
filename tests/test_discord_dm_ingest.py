@@ -22,7 +22,7 @@ import types
 
 import pytest
 
-from bots_common.download import TooLarge
+from bots_common.download import NotAFile, TooLarge
 from bots_common.index_client import AuthError, IndexUnavailable, UploadResult
 from bots_common.sniff import Blocked
 from discord_bot import bot as botmod
@@ -355,6 +355,15 @@ def test_a_link_over_the_cap_is_refused_with_both_sizes(bot, monkeypatch):
     assert outcome.emoji == botmod.UNSUPPORTED and not outcome.retryable
     assert bot.index.uploads == []
     assert '(900 MB) is over the 512 MB link limit' in bot.logs[0]
+
+
+def test_a_link_that_is_only_a_web_page_is_refused_and_says_why(bot):
+    _failing_download(bot, NotAFile(
+        "that link opens a web page, not the file itself"))
+    outcome = run(bot._ingest(_att(), channel_message(), []))
+    assert outcome.emoji == botmod.UNSUPPORTED and not outcome.retryable
+    assert bot.index.uploads == []
+    assert 'opens a web page' in bot.logs[0]
 
 
 # ── Where status lines go ─────────────────────────────────────────────────

@@ -22,6 +22,7 @@ page, which the bot redeems with the sender's id.
 """
 import asyncio
 import contextlib
+import functools
 import logging
 import os
 import tempfile
@@ -31,10 +32,11 @@ import aiohttp
 import discord
 
 from bots_common import env, resolver, site_logins, sniff
-from bots_common.download import TooLarge
+from bots_common.download import NotAFile, TooLarge
 from bots_common.index_client import AuthError, IndexUnavailable
 
 from . import config, download, notifier, parsing, retry
+from .album_status import AlbumStatus
 from .index_client import IndexClient
 
 logging.basicConfig(level=logging.INFO,
@@ -70,13 +72,16 @@ class _Outcome:
 
 class _UrlSource:
     """Adapter so media behind links/embeds flows through _ingest exactly
-    like an attachment (same .url/.filename/.size surface)."""
-    __slots__ = ('url', 'filename', 'size')
+    like an attachment (same .url/.filename/.size surface). A file from a
+    Bunkr album knows its album, so its status goes in the album's one
+    message (album_status.py)."""
+    __slots__ = ('url', 'filename', 'size', 'album')
 
-    def __init__(self, url, filename):
+    def __init__(self, url, filename, album=None):
         self.url = url
         self.filename = filename
         self.size = 0   # unknown until downloaded
+        self.album = album
 
 
 class _LocalSource:
@@ -233,35 +238,57 @@ class IndexBot(discord.Client):
     def _is_dm(message):
         return isinstance(message.channel, discord.DMChannel)
 
+    def _report_suffix(self, message):
+        """What _report adds below a status line: the link back to a
+        channel message. A DM's line is a reply to it already."""
+        return "" if self._is_dm(message) else f"\n{message.jump_url}"
+
     async def _report(self, message, text):
         """Status line about one message. A channel ingest's goes to the
         bot-logs channel with a link back; a DM's goes back into the DM,
-        because its filenames, tags and links describe private media."""
+        because its filenames, tags and links describe private media.
+        Returns the posted discord.Message, or None when there is nowhere
+        to post it or posting failed."""
         if not self._is_dm(message):
-            await self._log(f"{text}\n{message.jump_url}")
-            return
+            return await self._log(text + self._report_suffix(message))
         try:
-            await message.channel.send(
+            return await message.channel.send(
                 text[:2000], suppress_embeds=True,
                 reference=message.to_reference(fail_if_not_exists=False))
         except discord.HTTPException:
             logging.warning("dm: could not reply to message %s", message.id,
                             exc_info=True)
+            return None
+
+    async def _edit_report(self, message, sent, text):
+        """Replace the text of a status line _report posted for `message`.
+        True when Discord took the edit; on False the caller posts anew
+        (the line may have been deleted)."""
+        try:
+            await sent.edit(content=(text + self._report_suffix(message))[:2000],
+                            suppress=True)
+            return True
+        except discord.HTTPException:
+            logging.warning("status: could not edit status message for %s",
+                            message.id, exc_info=True)
+            return False
 
     async def _log(self, text):
         """Best-effort status line to the bot-logs channel; never raises.
-        The channel is optional (DISCORD_LOG_CHANNEL_ID unset = disabled)."""
+        The channel is optional (DISCORD_LOG_CHANNEL_ID unset = disabled).
+        Returns the posted discord.Message, or None."""
         if not config.LOG_CHANNEL_ID:
-            return
+            return None
         try:
             channel = self._log_channel or self.get_channel(config.LOG_CHANNEL_ID)
             if channel is None:
                 channel = await self.fetch_channel(config.LOG_CHANNEL_ID)
             self._log_channel = channel
-            await channel.send(text[:2000], suppress_embeds=True)
+            return await channel.send(text[:2000], suppress_embeds=True)
         except Exception:
             logging.warning("botlog: could not post to channel %s",
                             config.LOG_CHANNEL_ID, exc_info=True)
+            return None
 
     async def on_message(self, message):
         # Loop guard: never react to our own messages, even if the notify
@@ -439,13 +466,35 @@ class IndexBot(discord.Client):
 
     async def _ingest_all(self, message, sources, tags, attempts):
         """Ingest each source with the same tags, react with each outcome,
-        and settle the message."""
-        outcomes = []
-        for src in sources:
-            outcome = await self._ingest(src, message, tags)
-            await self._react(message, outcome.emoji)
-            outcomes.append(outcome)
+        and settle the message. The files of a Bunkr album report into one
+        status message per album, edited as they settle, rather than a
+        line each."""
+        outcomes, albums = [], {}
+        try:
+            for src in sources:
+                album = getattr(src, 'album', None)
+                status = None
+                if album is not None:
+                    status = albums.get(album.url)
+                    if status is None:
+                        status = albums[album.url] = self._album_status(
+                            message, album)
+                outcome = await self._ingest(src, message, tags, status)
+                await self._react(message, outcome.emoji)
+                outcomes.append(outcome)
+        finally:
+            for status in albums.values():
+                await status.finish()
         await self._settle(message, outcomes, attempts, tags)
+
+    def _album_status(self, message, album):
+        """The AlbumStatus for one album's files, posting where _report
+        would."""
+        return AlbumStatus(
+            album,
+            post=functools.partial(self._report, message),
+            edit=functools.partial(self._edit_report, message),
+            room=2000 - len(self._report_suffix(message)))
 
     # ── Index login backoff ────────────────────────────────────────────
     async def _backing_off(self, message):
@@ -457,17 +506,19 @@ class IndexBot(discord.Client):
         await self._react(message, BACKOFF)
         return _Outcome(BACKOFF, True, "the index login is backing off")
 
-    async def _auth_failed(self, message, where, what=None):
+    async def _auth_failed(self, message, where, what=None, say=None):
         """The index rejected the app password (the client starts its
         cooldown). Logs it, reports it on `what` (a file or link; without
         one the caller reports the outcome itself) and returns the
-        retryable outcome, so the retry queue tries again later."""
+        retryable outcome, so the retry queue tries again later. `say`
+        is where the line goes, _report by default."""
         wait = self.index.blocked()
         logging.exception("%s: index auth failed; backing off %.0fs",
                           where, wait)
         if what:
-            await self._report(message, f"⏳ {what} — index login failed, "
-                                        f"backing off {wait:.0f}s")
+            say = say or functools.partial(self._report, message)
+            await say(f"⏳ {what} — index login failed, "
+                      f"backing off {wait:.0f}s")
         return _Outcome(BACKOFF, True, "the index rejected our login")
 
     # ── Retry queue ────────────────────────────────────────────────────
@@ -545,11 +596,12 @@ class IndexBot(discord.Client):
     # ── Source discovery ───────────────────────────────────────────────
     async def _gather_sources(self, message):
         """Everything ingestible in a message: attachments (incl. forwarded
-        snapshots), direct media links in the text, and media behind embeds
-        (GIF picker, unfurled image/GIF links). Returns (sources, tag_text,
-        urls) — tag_text is the author's text with URLs removed, so a link
-        post can carry a tag list too; urls feed the yt-dlp fallback when
-        nothing was directly ingestible."""
+        snapshots), direct media links in the text, the files of a Bunkr
+        album, and media behind embeds (GIF picker, unfurled image/GIF
+        links). Returns (sources, tag_text, urls) — tag_text is the
+        author's text with URLs removed, so a link post can carry a tag
+        list too; urls feed the yt-dlp fallback when nothing was directly
+        ingestible, and leave out the albums, which are settled here."""
         sources, seen = [], set()
         texts = [message.content or '']
         attachments = list(message.attachments)
@@ -566,6 +618,15 @@ class IndexBot(discord.Client):
             if fname and url not in seen:
                 seen.add(url)
                 sources.append(_UrlSource(url, fname))
+        albums = await self._read_albums(message,
+                                         [u for u in urls if u not in seen])
+        for url, album in albums.items():
+            seen.add(url)
+            for link, fname in album.files:
+                if link not in seen:
+                    seen.add(link)
+                    sources.append(_UrlSource(link, fname, album))
+        urls = [u for u in urls if u not in albums]
         served = await self._sniff_links([u for u in urls if u not in seen])
         for url, (fetch_url, fname) in served.items():
             seen.update((url, fetch_url))
@@ -595,6 +656,26 @@ class IndexBot(discord.Client):
                 break
 
         return sources, parsing.strip_urls(message.content), urls
+
+    async def _read_albums(self, message, urls):
+        """{url: bunkr.Album} for the Bunkr albums among `urls`, each read
+        into the files it holds (at most DISCORD_ALBUM_MAX_FILES of them).
+
+        An album nothing comes of is settled here, with its 🚫 and its
+        reason. No later path could do better — yt-dlp has no Bunkr
+        support — so the album links are not handed on. What an album with
+        files leaves out is said at the top of its status message, once
+        its files are ingested (_ingest_all).
+        """
+        if not config.ALBUM_MAX_FILES:
+            return {}
+        albums = await self._downloader.read_albums(
+            urls, config.ALLOWED_EXT, config.ALBUM_MAX_FILES)
+        for url, album in albums.items():
+            if not album.files:
+                await self._report(message, f"🚫 <{url}> — {album.note()}")
+                await self._react(message, UNSUPPORTED)
+        return albums
 
     async def _sniff_links(self, urls):
         """{url: (fetch_url, filename)} for links that name no file but
@@ -827,7 +908,7 @@ class IndexBot(discord.Client):
         await self._ingest_all(message, attachments, entry.tags, attempts)
 
     # ── Ingest ─────────────────────────────────────────────────────────
-    async def _ingest(self, att, message, user_tags):
+    async def _ingest(self, att, message, user_tags, status=None):
         """Download one attachment and upload it to the index; returns the
         _Outcome describing the result. The message author is the Discord
         user who posted (or forwarded) the attachment — when they linked
@@ -835,7 +916,13 @@ class IndexBot(discord.Client):
         by that user instead of the bot account. A DM's is stored private
         to that user, and refused when there is none. `user_tags` (a list)
         is applied on top of INGEST_TAGS; all attachments of a message get
-        the same tags."""
+        the same tags.
+
+        With `status` (an AlbumStatus) the result is a line in the album's
+        message, and who it was indexed for, and under which tags, is said
+        once at its top instead of on every line."""
+        say = status.add if status else functools.partial(self._report,
+                                                            message)
         size_mb = (att.size or 0) / 1e6
         label = f"`{att.filename}`" + (f" ({size_mb:.1f} MB)" if size_mb else "")
         ext = parsing.file_ext(att.filename)
@@ -844,7 +931,7 @@ class IndexBot(discord.Client):
             if getattr(att, 'path', None):   # yt-dlp temp file, ours to drop
                 with contextlib.suppress(FileNotFoundError):
                     os.remove(att.path)
-            await self._report(message, f"🚫 {label} — unsupported type")
+            await say(f"🚫 {label} — unsupported type")
             return _Outcome(UNSUPPORTED)
         private = self._is_dm(message)
         tags = parsing.merge_tags(user_tags, parsing.split_tags(config.INGEST_TAGS))
@@ -874,28 +961,32 @@ class IndexBot(discord.Client):
                                              uploaded_for=uploaded_for,
                                              private=private)
         except AuthError:
-            return await self._auth_failed(message, 'ingest', label)
+            return await self._auth_failed(message, 'ingest', label, say)
         except IndexUnavailable as e:
             reason = f"couldn't look up who posted it — {e}"
-            await self._report(message, f"❌ {label} — {reason}")
+            await say(f"❌ {label} — {reason}")
             return _Outcome(ERROR, True, reason)
         except sniff.Blocked as e:
             # A link to a host that isn't on the public internet. Say which,
             # since the sender may simply have pasted a LAN URL by accident.
-            await self._report(message, f"🚫 {label} — {e}")
+            await say(f"🚫 {label} — {e}")
             return _Outcome(UNSUPPORTED)
         except TooLarge as e:
             size = f" ({e.size / 1e6:.0f} MB)" if e.size else ""
-            await self._report(
-                message, f"🚫 {label}{size} is over the "
-                f"{config.LINK_MAX_BYTES / 1e6:.0f} MB link limit")
+            await say(f"🚫 {label}{size} is over the "
+                      f"{config.LINK_MAX_BYTES / 1e6:.0f} MB link limit")
             return _Outcome(UNSUPPORTED)
+        except NotAFile as e:
+            # A file host's viewer page, or one it no longer lays out the
+            # way the bot reads it: a settled answer, not a retry.
+            await say(f"🚫 {label} — {e}")
+            return _Outcome(UNSUPPORTED, False, str(e))
         except aiohttp.ClientResponseError as e:
             logging.warning("ingest: download of %s failed HTTP %s",
                             att.filename, e.status)
             reason = (f"couldn't fetch the file (source returned "
                       f"HTTP {e.status})")
-            await self._report(message, f"❌ {label} — {reason}")
+            await say(f"❌ {label} — {reason}")
             # 5xx/429 is the source having a bad moment; a 404/410 is not
             # going to start existing later.
             return _Outcome(ERROR, e.status >= 500 or e.status == 429, reason)
@@ -903,12 +994,11 @@ class IndexBot(discord.Client):
             logging.warning("ingest: transfer of %s failed: %s",
                             att.filename, type(e).__name__)
             reason = f"network error during transfer ({type(e).__name__})"
-            await self._report(message, f"❌ {label} — {reason}")
+            await say(f"❌ {label} — {reason}")
             return _Outcome(ERROR, True, reason)
         except Exception as e:
             logging.exception("ingest: failed for %s", att.filename)
-            await self._report(
-                message, f"❌ {label} — {type(e).__name__} (see container log)")
+            await say(f"❌ {label} — {type(e).__name__} (see container log)")
             return _Outcome(ERROR)
         finally:
             with contextlib.suppress(FileNotFoundError):
@@ -916,15 +1006,17 @@ class IndexBot(discord.Client):
         logging.info("ingest: %s → %s", att.filename, result.status)
         if result.status == 'ok':
             how = "privately for" if private else "for"
-            await self._report(
-                message, f"✅ {label} indexed {how} **{owner}** — tags: `{tags}`")
+            if status:
+                status.indexed_as(f"Indexed {how} **{owner}** — tags: `{tags}`")
+                await say(f"✅ {label}")
+            else:
+                await say(f"✅ {label} indexed {how} **{owner}** — tags: `{tags}`")
             return _Outcome(OK)
         if result.status == 'duplicate':
-            await self._report(
-                message, f"♻️ {label} — {self._duplicate_note(result)}")
+            await say(f"♻️ {label} — {self._duplicate_note(result)}")
             return _Outcome(DUPLICATE)
         reason = result.detail or 'the index rejected the upload'
-        await self._report(message, f"❌ {label} — {reason}")
+        await say(f"❌ {label} — {reason}")
         return _Outcome(ERROR, result.retryable, reason)
 
     @staticmethod
