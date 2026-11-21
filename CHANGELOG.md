@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-11-21
+
 The web app works properly on a phone now. Page links sit in a tab bar
 at the bottom of the screen instead of a top bar that hid most of them.
 The gallery's filters fold away, and the lightbox fills the screen and
@@ -14,7 +16,7 @@ the screen down to the tab bar. Uploads show their progress, and the admin
 tables turn into cards you can read without scrolling sideways. Desktop
 layouts are unchanged apart from the fixes below.
 
-### Upgrading
+### Upgrading from 1.2.0
 
 - Rebuild the web app image with `./build.sh`. The bots and the database
   are untouched.
@@ -372,7 +374,8 @@ a network folder, Discord and Telegram.
 
 See [Security model](docs/security.md#known-limitations) for details.
 
-[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Houdini99/MediaIndex/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Houdini99/MediaIndex/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Houdini99/MediaIndex/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Houdini99/MediaIndex/releases/tag/v1.0.0
