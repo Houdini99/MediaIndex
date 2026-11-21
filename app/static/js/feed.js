@@ -144,8 +144,10 @@ function buildSlide(m) {
         ? `<button class="feed-btn is-danger" data-action="feed-delete" data-id="${m.id}" title="Delete">×</button>`
         : '';
     slide.innerHTML = `
-      <span class="feed-type ${esc(m.type)}">${esc(m.type)}</span>
-      ${privateBadge}
+      <div class="feed-badges">
+        <span class="feed-type ${esc(m.type)}">${esc(m.type)}</span>
+        ${privateBadge}
+      </div>
       <div class="feed-actions">
         <a class="feed-btn" href="/media/${esc(m.filepath)}" download="${esc(dlName)}" title="Download">↓</a>
         ${deleteBtn}
@@ -315,7 +317,9 @@ function updateVolumeUI() {
     const muteX = volumeIcon.querySelector('[data-vol-mute]');
     if (wave2) wave2.style.opacity = (!muted && settings.volume >= 0.34) ? '1' : '0';
     if (wave3) wave3.style.opacity = (!muted && settings.volume >= 0.67) ? '1' : '0';
-    if (muteX) muteX.style.display = muted ? '' : 'none';
+    // SVG elements have no `hidden` property; the attribute is what base.css
+    // hides. (Assigning `.hidden` on one only made an expando.)
+    if (muteX) muteX.toggleAttribute('hidden', !muted);
     volumeBtn.classList.toggle('is-muted', muted);
 }
 function setMuted(m) {
@@ -344,6 +348,7 @@ const settingsPanel = document.getElementById('feedSettingsPanel');
 const settingsClose = document.getElementById('feedSettingsClose');
 const settingsApply = document.getElementById('feedSettingsApply');
 const settingsReset = document.getElementById('feedSettingsReset');
+const settingsBackdrop = document.getElementById('feedSettingsBackdrop');
 const includeInput = document.getElementById('feedIncludeTags');
 const excludeInput = document.getElementById('feedExcludeTags');
 const typeChecks = document.querySelectorAll('[data-type-toggle]');
@@ -364,6 +369,9 @@ function syncSettingsPanel() {
 // back to the button that opened it on the way out — otherwise Tab walks off
 // into a feed the reader cannot see.
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+//: A phone or tablet: no keyboard to drive the panel or leave fullscreen
+//  with, a finger instead of a cursor.
+const coarsePointer = window.matchMedia('(pointer: coarse)');
 
 function panelFocusables() {
     return [...settingsPanel.querySelectorAll(FOCUSABLE)].filter(el => !el.disabled && el.offsetParent !== null);
@@ -382,11 +390,16 @@ function trapPanelTab(e) {
 function openSettings() {
     syncSettingsPanel();
     settingsPanel.hidden = false;
+    if (settingsBackdrop) settingsBackdrop.hidden = false;
     settingsPanel.setAttribute('aria-modal', 'true');
     settingsBtn.setAttribute('aria-expanded', 'true');
     document.addEventListener('keydown', trapPanelTab, true);
     requestAnimationFrame(() => {
         settingsPanel.classList.add('is-open');
+        // Focus the panel's first control for the keyboard — but not on a
+        // touch screen, where the first control is a text field and
+        // focusing it throws the on-screen keyboard over the sheet.
+        if (coarsePointer.matches) return;
         const first = panelFocusables()[0];
         if (first) first.focus();
     });
@@ -395,6 +408,7 @@ function closeSettings() {
     if (settingsPanel.hidden) return;
     const hadFocus = settingsPanel.contains(document.activeElement);
     settingsPanel.classList.remove('is-open');
+    if (settingsBackdrop) settingsBackdrop.hidden = true;
     settingsBtn.setAttribute('aria-expanded', 'false');
     document.removeEventListener('keydown', trapPanelTab, true);
     if (hadFocus) settingsBtn.focus();
@@ -480,7 +494,11 @@ function showFullscreenHint() {
     if (fsHintEl) fsHintEl.remove();
     fsHintEl = document.createElement('div');
     fsHintEl.className = 'feed-fs-hint';
-    fsHintEl.textContent = 'Press ESC to exit fullscreen';
+    // No Escape key on a phone: the fullscreen button stays on screen
+    // there (feed.css) and is the way out.
+    fsHintEl.textContent = coarsePointer.matches
+        ? 'Tap the corner button to exit fullscreen'
+        : 'Press ESC to exit fullscreen';
     document.body.appendChild(fsHintEl);
     const el = fsHintEl;
     setTimeout(() => { el.remove(); if (fsHintEl === el) fsHintEl = null; }, 2800);
@@ -492,8 +510,8 @@ function updateFullscreenUI() {
     fullscreenBtn.title = fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen (f)';
     const expand = fullscreenBtn.querySelector('[data-fs-expand]');
     const collapse = fullscreenBtn.querySelector('[data-fs-collapse]');
-    if (expand) expand.hidden = fullscreen;
-    if (collapse) collapse.hidden = !fullscreen;
+    if (expand) expand.toggleAttribute('hidden', fullscreen);
+    if (collapse) collapse.toggleAttribute('hidden', !fullscreen);
 }
 
 function setFullscreen(on) {
@@ -511,6 +529,7 @@ function setFullscreen(on) {
     document.body.classList.toggle('is-feed-fullscreen', fullscreen);
     if (fullscreen) closeSettings();
     updateFullscreenUI();
+    syncNativeFullscreen(fullscreen);
 
     if (oldH) {
         const newH = slides[0].clientHeight || oldH;
@@ -519,6 +538,29 @@ function setFullscreen(on) {
     if (fullscreen) showFullscreenHint();
     else if (fsHintEl) { fsHintEl.remove(); fsHintEl = null; }
 }
+
+// On a touch screen the browser's own bars cost as much room as the app's,
+// so fullscreen there also asks for the real thing — where it exists:
+// iPhone Safari has no element fullscreen, and gets the in-page version
+// alone. A desktop keeps the in-page mode it always had.
+function syncNativeFullscreen(on) {
+    if (!coarsePointer.matches) return;
+    const root = document.documentElement;
+    try {
+        if (on && !document.fullscreenElement && root.requestFullscreen) {
+            const p = root.requestFullscreen({ navigationUI: 'hide' });
+            if (p && p.catch) p.catch(() => {});
+        } else if (!on && document.fullscreenElement && document.exitFullscreen) {
+            const p = document.exitFullscreen();
+            if (p && p.catch) p.catch(() => {});
+        }
+    } catch (_) { /* unsupported: the in-page mode is still on */ }
+}
+// Leaving native fullscreen by the system's own gesture (Back, swipe) ends
+// the in-page mode too, or the chrome would stay hidden with no reason.
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && fullscreen) setFullscreen(false);
+});
 
 fullscreenBtn.addEventListener('click', () => setFullscreen(!fullscreen));
 updateFullscreenUI();
@@ -810,8 +852,8 @@ function updateSlideshowUI() {
     slideshowBtn.title = on ? 'Stop slideshow (s)' : 'Start slideshow (s)';
     const play = slideshowBtn.querySelector('[data-ss-play]');
     const pause = slideshowBtn.querySelector('[data-ss-pause]');
-    if (play) play.hidden = on;
-    if (pause) pause.hidden = !on;
+    if (play) play.toggleAttribute('hidden', on);
+    if (pause) pause.toggleAttribute('hidden', !on);
     if (slideshowToggle) slideshowToggle.checked = on;
     if (slideshowTimerInput && document.activeElement !== slideshowTimerInput) {
         slideshowTimerInput.value = String(settings.slideshowTimer);
@@ -975,7 +1017,7 @@ function loadMore(loaderEl) {
                 if (requestedPage === 1 && idx === 0) {
                     const hint = document.createElement('div');
                     hint.className = 'scroll-hint';
-                    hint.textContent = 'Scroll ↓';
+                    hint.textContent = coarsePointer.matches ? 'Swipe up ↑' : 'Scroll ↓';
                     slide.appendChild(hint);
                     setTimeout(() => hint.remove(), 4000);
                 }

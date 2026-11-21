@@ -1,22 +1,37 @@
 /* Slide sizing lives here and nowhere else.
-   `--feed-nav-h` is the one number the feed layout depends on: the nav's
-   height (common.css). Fullscreen sets it to zero and every height below
-   follows, which is why feed.js never writes pixel heights per slide —
+   `--feed-h` is the one number the feed layout depends on: the screen
+   less the top nav (`--feed-nav-h`) and, on a phone, the tab bar below
+   (`--feed-tab-h`), both from common.css. Fullscreen sets those to zero
+   and every height below follows, which is why feed.js never writes pixel
+   heights per slide —
    inline styles would beat this stylesheet, the `dvh` rules would never
    apply, and each mobile URL-bar resize would knock the scroll off its
    snap point.
-   Keep the `vh` line: it is the fallback for engines without `dvh`. */
-    :root { --feed-nav-h: var(--nav-h, 58px); }
-    body.is-feed-fullscreen { --feed-nav-h: 0px; }
+   `--feed-h` carries the `vh` fallback for engines without `dvh`. */
+    :root {
+        --feed-nav-h: var(--nav-h, 58px);
+        /* The phone tab bar below the feed (common.css); 0 elsewhere. */
+        --feed-tab-h: var(--tabbar-h, 0px);
+    }
+    /* On body, not :root: a custom property resolves the var()s inside it
+       where it is declared, so one declared on :root would never see the
+       fullscreen class below zero the two heights on body. */
+    body { --feed-h: calc(100vh - var(--feed-nav-h) - var(--feed-tab-h)); }
+    @supports (height: 100dvh) {
+        body { --feed-h: calc(100dvh - var(--feed-nav-h) - var(--feed-tab-h)); }
+    }
+    body.is-feed-fullscreen { --feed-nav-h: 0px; --feed-tab-h: 0px; }
 
     html, body { height: 100%; overflow: hidden; }
     /* Plain black: the global gradient is absent on the feed. */
     body { background: #000; }
 
     .feed-container {
-        height: calc(100vh - var(--feed-nav-h));
-        height: calc(100dvh - var(--feed-nav-h));
+        height: var(--feed-h);
         overflow-y: scroll;
+        /* Pulling past the first slide must not chain to the page and fire
+           the browser's pull-to-refresh. */
+        overscroll-behavior: contain;
         scroll-snap-type: y mandatory;
         scroll-behavior: smooth;
         /* An auto-advancing feed of moving images is precisely the case this
@@ -34,8 +49,7 @@
     }
 
     .feed-slide {
-        height: calc(100vh - var(--feed-nav-h));
-        height: calc(100dvh - var(--feed-nav-h));
+        height: var(--feed-h);
         width: 100%;
         scroll-snap-align: start;
         scroll-snap-stop: always;
@@ -47,7 +61,7 @@
            math stable for slides that haven't been rendered yet. */
         content-visibility: auto;
         contain-intrinsic-width: auto 100vw;
-        contain-intrinsic-height: auto calc(100dvh - var(--feed-nav-h));
+        contain-intrinsic-height: auto var(--feed-h);
     }
 
     /* Sole owner of the media element's geometry. feed.js sets none of
@@ -143,8 +157,8 @@
     .feed-btn:hover {
         background: rgba(124,106,255,.25);
         border-color: var(--border-hi);
-        transform: scale(1.05);
     }
+    .feed-btn:active { transform: scale(.94); }
     .feed-btn.is-danger:hover {
         background: rgba(248,81,73,.25);
         border-color: rgba(248,81,73,.5);
@@ -156,10 +170,17 @@
         color: #fff;
     }
 
-    /* Type badge top-left */
-    .feed-type {
+    /* Type and private badges, top-left. Grouped so the private badge sits
+       beside the type rather than top-right, under the toolbar. */
+    .feed-badges {
         position: absolute;
         top: 1rem; left: 1rem;
+        display: flex;
+        gap: .35rem;
+        z-index: 3;
+        pointer-events: none;
+    }
+    .feed-type {
         padding: .25em .65em;
         border-radius: 5px;
         font-size: .7rem;
@@ -167,13 +188,11 @@
         letter-spacing: .04em;
         text-transform: uppercase;
         backdrop-filter: blur(8px);
-        z-index: 3;
     }
     .feed-type.video { background: rgba(92,124,255,.55); color: #c0cfff; border: 1px solid rgba(92,124,255,.3); }
     .feed-type.gif   { background: rgba(168,85,247,.55); color: #e8c5ff; border: 1px solid rgba(168,85,247,.3); }
     .feed-type.image { background: rgba(20,160,120,.55); color: #a0f0d8; border: 1px solid rgba(20,160,120,.3); }
     .feed-type.private {
-        top: 1rem; left: auto; right: 1rem;
         background: rgba(248,81,73,.6);
         color: #ffd9d4;
         border: 1px solid rgba(248,81,73,.35);
@@ -205,8 +224,13 @@
     .feed-tool-btn:hover {
         background: rgba(124,106,255,.25);
         border-color: var(--border-hi);
-        transform: scale(1.05);
     }
+    /* Grow on a real hover only; on a touch screen :hover sticks. */
+    @media (hover: hover) {
+        .feed-btn:hover,
+        .feed-tool-btn:hover { transform: scale(1.05); }
+    }
+    .feed-tool-btn:active { transform: scale(.94); }
     .feed-tool-btn.is-muted { color: var(--text2); }
     .feed-tool-btn[aria-expanded="true"],
     .feed-tool-btn.is-active {
@@ -310,6 +334,9 @@
        finishes). Without this the `display: flex` above would keep the panel
        laid out — invisible but still capturing clicks and blocking scroll. */
     .feed-settings-panel[hidden] { display: none; }
+    /* Phone only (below): the sheet's dimmer and grab handle. */
+    .feed-sheet-backdrop,
+    .feed-sheet-handle { display: none; }
     .feed-settings-header {
         display: flex;
         align-items: center;
@@ -508,8 +535,7 @@
 
     /* Loading sentinel slide */
     .feed-loader-slide {
-        height: calc(100vh - var(--feed-nav-h));
-        height: calc(100dvh - var(--feed-nav-h));
+        height: var(--feed-h);
         scroll-snap-align: start;
         display: flex;
         align-items: center;
@@ -550,8 +576,7 @@
 
     /* Empty state */
     .feed-empty {
-        height: calc(100vh - var(--feed-nav-h));
-        height: calc(100dvh - var(--feed-nav-h));
+        height: var(--feed-h);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -583,16 +608,23 @@
     }
 
     /* Scroll hint on first slide */
+    /* Above the uploader/tags overlay, not on top of it. */
     .scroll-hint {
         position: absolute;
-        bottom: 1.25rem;
+        bottom: 34%;
         left: 50%;
         transform: translateX(-50%);
+        padding: .35rem .8rem;
+        border-radius: 99px;
+        background: rgba(12,16,24,.6);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         font-size: .72rem;
-        color: var(--muted);
+        color: var(--text2);
         letter-spacing: .08em;
         text-transform: uppercase;
-        opacity: .7;
+        white-space: nowrap;
+        opacity: .85;
         animation: bounce 1.6s ease-in-out infinite;
         z-index: 3;
         pointer-events: none;
@@ -614,7 +646,7 @@
     body.is-feed-fullscreen nav,
     body.is-feed-fullscreen .feed-toolbar,
     body.is-feed-fullscreen .feed-settings-panel,
-    body.is-feed-fullscreen .feed-type,
+    body.is-feed-fullscreen .feed-badges,
     body.is-feed-fullscreen .feed-actions,
     body.is-feed-fullscreen .feed-overlay,
     body.is-feed-fullscreen .feed-progress,
@@ -624,7 +656,7 @@
     /* Only way out is Escape, so say so — then get out of the way. */
     .feed-fs-hint {
         position: fixed;
-        bottom: 1.5rem;
+        bottom: calc(1.5rem + var(--safe-bottom));
         left: 50%;
         transform: translateX(-50%);
         padding: .45rem .9rem;
@@ -647,13 +679,102 @@
         100% { opacity: 0; }
     }
 
-    @media (max-width: 680px) {
-        .feed-overlay { padding: 1rem 1rem 1.25rem; }
-        .feed-slide.has-video .feed-overlay { padding-bottom: 2.4rem; }
-        .feed-actions { right: .65rem; bottom: 4.5rem; gap: .5rem; }
-        .feed-btn { width: 42px; height: 42px; font-size: 1rem; }
-        .feed-tags { max-width: calc(100% - 60px); }
-        .feed-toolbar { top: calc(var(--feed-nav-h) + .5rem); right: .65rem; gap: .4rem; }
-        .feed-volume-slider { width: 70px; }
-        .feed-settings-panel { top: calc(var(--feed-nav-h) + 56px); right: .65rem; }
+    /* ── Touch screens ──────────────────────────────────────────────────── */
+    @media (pointer: coarse) {
+        /* Volume belongs to the hardware buttons on a phone — iOS ignores
+           a page that sets it at all. Mute stays. */
+        .feed-volume-slider { display: none; }
+        .feed-volume { padding: 2px; }
+        /* The scrubber is 4px tall; give a finger 32px to land on. */
+        .feed-progress-track::before {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            top: -14px; bottom: -14px;
+        }
+        .feed-progress-handle { opacity: 1; }
+        /* No Escape key to leave fullscreen with: its button stays on
+           screen, faded, alone in the corner. */
+        body.is-feed-fullscreen .feed-toolbar {
+            display: flex !important;
+            top: calc(var(--safe-top) + .6rem);
+            opacity: .5;
+        }
+        body.is-feed-fullscreen .feed-toolbar > :not(#feedFullscreenBtn) { display: none; }
+    }
+
+    /* ── Phone ──────────────────────────────────────────────────────────── */
+    @media (max-width: 760px) {
+        /* The feed runs from the top edge of the screen to the tab bar: the
+           top bar goes, the tab bar stays, black like the slides. */
+        :root { --feed-nav-h: 0px; }
+        nav { height: 0; padding: 0; border-bottom: none; }
+        nav::before { display: none; }
+        nav > :not(.nav-links) { display: none; }
+        .nav-links { background: #000; border-top-color: rgba(255,255,255,.08); }
+
+        .feed-toolbar {
+            top: calc(var(--feed-nav-h) + var(--safe-top) + .6rem);
+            right: max(.65rem, var(--safe-right));
+            gap: .4rem;
+        }
+        .feed-tool-btn { width: 40px; height: 40px; }
+        .feed-volume .feed-tool-btn { width: 36px; height: 36px; }
+        .feed-badges {
+            top: calc(var(--safe-top) + .9rem);
+            left: max(.75rem, var(--safe-left));
+        }
+
+        /* Tags stop short of the action rail and at three lines. */
+        .feed-overlay { padding: 1rem 4.4rem 1rem max(1rem, var(--safe-left)); }
+        .feed-slide.has-video .feed-overlay { padding-bottom: 2.7rem; }
+        .feed-tags { max-width: 100%; max-height: 4.9rem; overflow: hidden; }
+        .feed-actions { right: max(.7rem, var(--safe-right)); bottom: 4.75rem; gap: .65rem; }
+        .feed-slide.has-video .feed-actions { bottom: 5.75rem; }
+        .feed-btn { width: 46px; height: 46px; font-size: 1.1rem; }
+        .feed-progress { padding: 0 max(.85rem, var(--safe-right)) .65rem max(.85rem, var(--safe-left)); }
+
+        /* Settings: a sheet up from the bottom edge, over the tab bar, the
+           feed dimmed behind it. */
+        .feed-sheet-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            z-index: 85;
+            background: rgba(0,0,0,.55);
+            animation: feedFade .18s ease;
+        }
+        @keyframes feedFade { from { opacity: 0; } to { opacity: 1; } }
+        .feed-settings-panel {
+            top: auto;
+            bottom: 0; left: 0; right: 0;
+            width: auto;
+            max-width: none;
+            max-height: 88vh;
+            max-height: 88dvh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            z-index: 90;
+            border-radius: 20px 20px 0 0;
+            border-bottom: none;
+            padding: .5rem max(1.1rem, var(--safe-right)) calc(1.2rem + var(--safe-bottom)) max(1.1rem, var(--safe-left));
+            background: rgba(12,16,24,.98);
+            transform: translateY(24px);
+            transform-origin: bottom center;
+        }
+        .feed-settings-panel.is-open { transform: none; }
+        .feed-sheet-handle {
+            display: block;
+            flex-shrink: 0;
+            width: 40px; height: 4px;
+            margin: .2rem auto 0;
+            border-radius: 99px;
+            background: var(--border2);
+        }
+        .feed-settings-header { font-size: 1rem; }
+        .feed-settings-close { width: 40px; height: 40px; font-size: 1.6rem; }
+        .feed-toggle-chip { padding: .55rem 1rem; font-size: .88rem; }
+        .feed-settings-input { padding: .65rem .8rem; }
+        .feed-slideshow-timer .feed-settings-input { width: 84px; }
+        .feed-settings-action { padding: .8rem; font-size: .9rem; }
     }

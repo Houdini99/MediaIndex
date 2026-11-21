@@ -1,0 +1,21 @@
+{# The <head> lines every page shares, the app pages (base.html) and the
+   sign-in pages (auth/auth_base.html) alike.
+
+   No viewport-fit=cover: it asks the browser to lay the page out under
+   the phone's navigation bar, and Chromium browsers then reported that
+   bar as a safe-area inset even while their toolbar was showing and the
+   page stopped above it — the tab bar sat a bar's height up the screen
+   until a scroll hid the toolbar. Without it the browser keeps the page
+   clear of its own bars. The manifest and the touch icon make "Add to
+   Home Screen" open the app full screen, like an installed one. #}
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#020408"/>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+  <meta name="apple-mobile-web-app-title" content="MediaIndex"/>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}"/>
+  <link rel="icon" href="{{ url_for('main.favicon') }}" type="image/x-icon"/>
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}"/>

@@ -40,7 +40,7 @@
     <div class="admin-section-head">
       <div class="admin-section-title">Fingerprint index</div>
       <div class="dupe-head-actions">
-        <span class="admin-note" style="margin:0">
+        <span class="admin-note admin-note-inline">
           {% if status.coverage.last_hashed_at %}Last updated {{ status.coverage.last_hashed_at }}{% else %}Never built{% endif %}
         </span>
       </div>
@@ -166,7 +166,7 @@
       <div class="admin-section-title">Groups <span class="count-badge" id="groupCount">—</span></div>
       <div class="dupe-head-actions" id="pager" hidden>
         <button type="button" class="btn btn-ghost btn-sm" id="prevPage">← Previous</button>
-        <span class="admin-note" id="pageLabel" style="margin:0"></span>
+        <span class="admin-note admin-note-inline" id="pageLabel"></span>
         <button type="button" class="btn btn-ghost btn-sm" id="nextPage">Next →</button>
       </div>
     </div>
@@ -214,18 +214,18 @@
           <tbody>
             {% for mid, filepath, thumb, tags, owner, keeper_id, distance, marked_at, marker, bytes in quarantine %}
             <tr>
-              <td><input type="checkbox" name="media_id" value="{{ mid }}"></td>
-              <td>
+              <td class="cell-check"><input type="checkbox" name="media_id" value="{{ mid }}" aria-label="Select #{{ mid }}"></td>
+              <td class="cell-thumb">
                 {% if thumb %}
                 <img class="dupe-mini" loading="lazy" src="{{ url_for('media.serve_thumb', fname=thumb|basename) }}" alt="">
                 {% else %}—{% endif %}
               </td>
-              <td>#{{ mid }}</td>
-              <td>{% if keeper_id %}#{{ keeper_id }}{% else %}—{% endif %}</td>
-              <td>{{ owner or 'Unknown' }}</td>
-              <td>{{ (bytes / 1048576)|round(2) if bytes else '—' }} MB</td>
-              <td class="mono">{{ marked_at }}{% if marker %} · {{ marker }}{% endif %}</td>
-              <td class="mono">{{ tags or '(none)' }}</td>
+              <td class="cell-title cell-inline">#{{ mid }}</td>
+              <td data-label="Kept instead">{% if keeper_id %}#{{ keeper_id }}{% else %}—{% endif %}</td>
+              <td data-label="Uploader">{{ owner or 'Unknown' }}</td>
+              <td data-label="Size">{{ (bytes / 1048576)|round(2) if bytes else '—' }} MB</td>
+              <td class="mono" data-label="Marked">{{ marked_at }}{% if marker %} · {{ marker }}{% endif %}</td>
+              <td class="mono" data-label="Tags">{{ tags or '(none)' }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -260,10 +260,10 @@
           <tbody>
             {% for a_id, b_id, a_file, b_file, when, who in dismissed %}
             <tr>
-              <td><input type="checkbox" name="pair" value="{{ a_id }}:{{ b_id }}"></td>
-              <td>#{{ a_id }} ↔ #{{ b_id }}</td>
-              <td class="mono">{{ a_file|basename if a_file else '(deleted)' }} · {{ b_file|basename if b_file else '(deleted)' }}</td>
-              <td class="mono">{{ when }}{% if who %} · {{ who }}{% endif %}</td>
+              <td class="cell-check"><input type="checkbox" name="pair" value="{{ a_id }}:{{ b_id }}" aria-label="Select #{{ a_id }} and #{{ b_id }}"></td>
+              <td class="cell-title cell-inline">#{{ a_id }} ↔ #{{ b_id }}</td>
+              <td class="mono" data-label="Files">{{ a_file|basename if a_file else '(deleted)' }} · {{ b_file|basename if b_file else '(deleted)' }}</td>
+              <td class="mono" data-label="Dismissed">{{ when }}{% if who %} · {{ who }}{% endif %}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -289,10 +289,10 @@
         <tbody>
           {% for mid, filepath, ftype, error, when in errors %}
           <tr>
-            <td>#{{ mid }}</td>
-            <td class="mono">{{ filepath|basename }}</td>
-            <td>{{ ftype or '—' }}</td>
-            <td class="mono">{{ error }}</td>
+            <td class="cell-title">#{{ mid }}</td>
+            <td class="mono" data-label="File">{{ filepath|basename }}</td>
+            <td data-label="Type">{{ ftype or '—' }}</td>
+            <td class="mono" data-label="Error">{{ error }}</td>
           </tr>
           {% endfor %}
         </tbody>

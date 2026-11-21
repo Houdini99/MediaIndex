@@ -35,7 +35,7 @@
         <thead><tr><th>ID</th><th>Missing file</th></tr></thead>
         <tbody>
           {% for mid, fp, th in report.missing_rows[:200] %}
-          <tr><td>#{{ mid }}</td><td class="mono">{{ fp|basename }}</td></tr>
+          <tr><td class="cell-title">#{{ mid }}</td><td class="mono" data-label="Missing file">{{ fp|basename }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -68,7 +68,7 @@
         <thead><tr><th>File</th><th>Size</th></tr></thead>
         <tbody>
           {% for name, size in report.orphan_files[:200] %}
-          <tr><td class="mono">{{ name }}</td><td>{{ (size / 1048576)|round(2) }} MB</td></tr>
+          <tr><td class="mono cell-title">{{ name }}</td><td data-label="Size">{{ (size / 1048576)|round(2) }} MB</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -100,7 +100,7 @@
         <thead><tr><th>Thumbnail</th><th>Size</th></tr></thead>
         <tbody>
           {% for name, size in report.orphan_thumbs[:200] %}
-          <tr><td class="mono">{{ name }}</td><td>{{ (size / 1024)|round(1) }} KB</td></tr>
+          <tr><td class="mono cell-title">{{ name }}</td><td data-label="Size">{{ (size / 1024)|round(1) }} KB</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -130,7 +130,7 @@
         <thead><tr><th>ID</th><th>File</th></tr></thead>
         <tbody>
           {% for mid, fp, th in report.placeholder_thumbs[:200] %}
-          <tr><td>#{{ mid }}</td><td class="mono">{{ fp|basename }}</td></tr>
+          <tr><td class="cell-title">#{{ mid }}</td><td class="mono" data-label="File">{{ fp|basename }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

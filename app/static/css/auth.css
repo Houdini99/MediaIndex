@@ -12,6 +12,7 @@
         min-height: 100vh;
         display: flex; align-items: center; justify-content: center;
         padding: 1.5rem;
+        padding: max(1.5rem, var(--safe-top)) max(1.25rem, var(--safe-right)) max(1.5rem, var(--safe-bottom)) max(1.25rem, var(--safe-left));
         -webkit-font-smoothing: antialiased;
     }
     .auth-wrap {
@@ -117,7 +118,9 @@
     .submit-btn:hover {
         filter: brightness(1.08);
         box-shadow: 0 0 0 1px rgba(124,106,255,.45), 0 6px 22px rgba(124,106,255,.32);
-        transform: translateY(-1px);
+    }
+    @media (hover: hover) {
+        .submit-btn:hover { transform: translateY(-1px); }
     }
     .submit-btn:active { transform: none; filter: brightness(.96); }
     /* Footer */
@@ -152,4 +155,10 @@
         height: 1px;
         background: var(--border);
         margin: 1.25rem 0;
+    }
+
+    @media (max-width: 760px) {
+        .auth-card { padding: 1.5rem 1.25rem 1.35rem; border-radius: 14px; }
+        .field input { height: 48px; }
+        .submit-btn { padding: .85rem; }
     }

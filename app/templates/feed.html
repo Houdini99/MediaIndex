@@ -40,7 +40,11 @@
   </button>
 </div>
 
+{#- Dims the feed behind the settings sheet on a phone and takes the tap
+    that closes it, so that tap cannot also zoom the picture underneath. #}
+<div class="feed-sheet-backdrop" id="feedSettingsBackdrop" hidden></div>
 <div class="feed-settings-panel" id="feedSettingsPanel" hidden role="dialog" aria-label="Feed settings">
+  <div class="feed-sheet-handle" aria-hidden="true"></div>
   <div class="feed-settings-header">
     <span>Feed Settings</span>
     <button type="button" class="feed-settings-close" id="feedSettingsClose" aria-label="Close settings">×</button>
@@ -64,11 +68,11 @@
   </div>
   <div class="feed-settings-section">
     <label class="feed-settings-label" for="feedIncludeTags">Include tags <span class="feed-settings-hint">comma separated, all must match</span></label>
-    <input type="text" id="feedIncludeTags" class="feed-settings-input" placeholder="e.g. cats, sunset" autocomplete="off" spellcheck="false" data-tag-ac>
+    <input type="text" id="feedIncludeTags" class="feed-settings-input" placeholder="e.g. cats, sunset" autocomplete="off" spellcheck="false" enterkeyhint="done" data-tag-ac>
   </div>
   <div class="feed-settings-section">
     <label class="feed-settings-label" for="feedExcludeTags">Exclude tags <span class="feed-settings-hint">comma separated</span></label>
-    <input type="text" id="feedExcludeTags" class="feed-settings-input" placeholder="e.g. ai, fake" autocomplete="off" spellcheck="false" data-tag-ac>
+    <input type="text" id="feedExcludeTags" class="feed-settings-input" placeholder="e.g. ai, fake" autocomplete="off" spellcheck="false" enterkeyhint="done" data-tag-ac>
   </div>
   <div class="feed-settings-section">
     <label class="feed-toggle-chip">
@@ -85,7 +89,7 @@
         <span>Enable</span>
       </label>
       <div class="feed-slideshow-timer">
-        <input type="number" id="feedSlideshowTimer" class="feed-settings-input" min="1" max="120" step="1" value="5" aria-label="Slideshow timer in seconds">
+        <input type="number" id="feedSlideshowTimer" class="feed-settings-input" min="1" max="120" step="1" value="5" inputmode="numeric" aria-label="Slideshow timer in seconds">
         <span class="feed-settings-hint">sec / photo</span>
       </div>
     </div>

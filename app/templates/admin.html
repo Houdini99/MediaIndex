@@ -46,9 +46,9 @@
       <tbody>
         {% for uid, username, is_admin in users %}
         <tr>
-          <td>{{ uid }}</td>
-          <td>{{ username }}{% if uid == g.user.id %} <span class="you-badge">you</span>{% endif %}</td>
-          <td>{% if is_admin %}<span class="role-badge role-admin">admin</span>{% else %}<span class="role-badge">user</span>{% endif %}</td>
+          <td data-label="ID">{{ uid }}</td>
+          <td class="cell-title">{{ username }}{% if uid == g.user.id %} <span class="you-badge">you</span>{% endif %}</td>
+          <td data-label="Role">{% if is_admin %}<span class="role-badge role-admin">admin</span>{% else %}<span class="role-badge">user</span>{% endif %}</td>
           <td class="col-actions">
             <form method="post" action="{{ url_for('admin.change_password', user_id=uid) }}" class="inline-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -102,10 +102,10 @@
       <tbody>
         {% for ip, count, last_attempt, manual in banned_ips %}
         <tr>
-          <td class="mono">{{ ip }}</td>
-          <td>{{ count }}</td>
-          <td>{{ last_attempt or '—' }}</td>
-          <td>{{ 'manual (permanent)' if manual else 'automatic' }}</td>
+          <td class="mono cell-title">{{ ip }}</td>
+          <td data-label="Failed attempts">{{ count }}</td>
+          <td data-label="Last attempt">{{ last_attempt or '—' }}</td>
+          <td data-label="Type">{{ 'manual (permanent)' if manual else 'automatic' }}</td>
           <td class="col-actions">
             <form method="post" action="{{ url_for('admin.lift_ban') }}" class="inline-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -130,9 +130,9 @@
       <tbody>
         {% for ip, count, last_attempt in watchlist %}
         <tr>
-          <td class="mono">{{ ip }}</td>
-          <td>{{ count }} / {{ ban_threshold }}{% if count >= ban_threshold // 2 %} <span class="warn-badge">⚠</span>{% endif %}</td>
-          <td>{{ last_attempt or '—' }}</td>
+          <td class="mono cell-title">{{ ip }}</td>
+          <td data-label="Failed attempts">{{ count }} / {{ ban_threshold }}{% if count >= ban_threshold // 2 %} <span class="warn-badge">⚠</span>{% endif %}</td>
+          <td data-label="Last attempt">{{ last_attempt or '—' }}</td>
           <td class="col-actions">
             <form method="post" action="{{ url_for('admin.ban') }}" class="inline-form"
                   data-confirm="Ban {{ ip }} now?">
@@ -190,9 +190,9 @@
           <tbody>
             {% for mid, before, after in tag_result.changes %}
             <tr>
-              <td>#{{ mid }}</td>
-              <td class="mono">{{ before }}</td>
-              <td class="mono">{{ after or '(empty)' }}</td>
+              <td class="cell-title">#{{ mid }}</td>
+              <td class="mono" data-label="Before">{{ before }}</td>
+              <td class="mono" data-label="After">{{ after or '(empty)' }}</td>
             </tr>
             {% endfor %}
           </tbody>

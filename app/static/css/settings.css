@@ -53,3 +53,14 @@
         border-radius: 8px;
         user-select: all;
     }
+
+    @media (max-width: 760px) {
+        .settings-layout { max-width: none; gap: .9rem; }
+        .link-input { height: 44px; }
+        .link-actions .btn { flex: 1; }
+        .dc-code-row { flex-wrap: wrap; }
+        .dc-code-row code { flex-basis: 100%; text-align: center; font-size: 1.05rem; }
+        .dc-code-row .btn { flex: 1; }
+        .info-row { flex-wrap: wrap; }
+        .info-val { text-align: left; }
+    }

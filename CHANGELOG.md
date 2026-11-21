@@ -6,6 +6,76 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+The web app works properly on a phone now. Page links sit in a tab bar
+at the bottom of the screen instead of a top bar that hid most of them.
+The gallery's filters fold away, and the lightbox fills the screen and
+responds to swipes and the Back gesture. The feed runs from the top of
+the screen down to the tab bar. Uploads show their progress, and the admin
+tables turn into cards you can read without scrolling sideways. Desktop
+layouts are unchanged apart from the fixes below.
+
+### Upgrading
+
+- Rebuild the web app image with `./build.sh`. The bots and the database
+  are untouched.
+
+### Added
+
+- Phone layout (screens up to 760px wide). A slim top bar with the
+  account button, and Gallery, Feed, Upload, Untagged and Tags as a tab
+  bar along the bottom edge. Between 761px and
+  1023px, Settings, Admin Panel and Sign Out move into a menu behind the
+  user chip, so the top bar no longer runs off the screen.
+- "Add to Home Screen" opens MediaIndex full screen like an installed
+  app, with its own icon (a web app manifest and touch icons).
+- Gallery on a phone: the search box, Filters and Select share one row,
+  and the other filters open under Filters, which shows how many are
+  set. Cards are two to a row with their tags kept to two lines.
+- Lightbox: on a phone it fills the screen with icon buttons. Swipe
+  sideways for the next or previous file and swipe down to close. The
+  Back button or gesture closes it at any width, instead of leaving the
+  gallery and every page infinite scroll had loaded.
+- Lightbox: "Edit tags" edits the open file's tags in place. Edit and
+  Delete only show on files you own (or as an admin).
+- Upload: a progress bar with bytes sent, then "Processing…" while the
+  server works. The results show on the same page. On a phone the drop
+  zone says "tap to pick" rather than "drag", previews stay compact rows,
+  and the upload button stays in reach above the tab bar.
+- Feed on a phone: slides run from the top edge to the tab bar, and the
+  settings open as a sheet from the bottom. Fullscreen also hides the
+  browser's bars where the browser allows it, and its button stays on
+  screen as the way out, since a phone has no Escape key. The video
+  scrubber is easier to grab with a finger.
+- Admin pages on a phone: every table row becomes a card with labelled
+  values and full-width actions, the tabs scroll sideways in one row,
+  and the forms use the full width.
+
+### Changed
+
+- Deleting a file or saving its tags in the gallery updates the page in
+  place instead of reloading it, so you keep your place.
+- Every form field is 16px on a phone, so iOS no longer zooms the page
+  in when you tap into one.
+- Hover effects (cards lifting, buttons growing) only happen with a
+  mouse. On a touch screen they used to stick to whatever was tapped
+  last.
+- `POST /upload` and `POST /edit/<id>` answer scripted callers
+  (`X-Requested-With: XMLHttpRequest`) with JSON. Upload returns the
+  result messages and per-status counts, edit returns the stored tags.
+  `/mediadata/<id>` gains `can_edit`. Plain form posts behave as before.
+
+### Fixed
+
+- Buttons with the `hidden` attribute still showed, for example "Cancel
+  scan" and the groups pager on Near Duplicates, or Revoke with no
+  WebDAV password set.
+- The feed's slideshow and fullscreen buttons drew both of their icons on
+  top of each other.
+- In the feed, a private file's badge sat under the toolbar, and the
+  "Scroll" hint covered the tags.
+- The gallery toolbar's type and sort menus took a full row each.
+- The admin Users table ran wider than the screen at tablet widths.
+
 ## [1.2.0] — 2026-11-20
 
 Both bots can now download from Bunkr, single files and whole albums.

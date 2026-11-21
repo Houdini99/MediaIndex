@@ -1,5 +1,13 @@
 /* The app pages. base.css (loaded first) has the tokens, the reset and
-   the flash messages. */
+   the flash messages.
+
+   Three widths, set in one place each:
+     ≥ 1024px  the desktop: every nav item inline in the top bar.
+     761–1023  the account items (Settings, Admin, Sign Out) fold into a
+               menu behind the user chip; the page links stay on top.
+     ≤ 760px   a phone: a slim top bar, the page links as a tab bar
+               along the bottom of the screen, 16px form controls
+               (base.css) and full-width controls in the pages. */
     html { scroll-behavior: smooth; }
 
     ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -25,15 +33,26 @@
     /* ── NAVIGATION ─────────────────────────────────────────────────────── */
     nav {
         height: var(--nav-h);
-        background: rgba(2,4,8,.88);
         border-bottom: 1px solid var(--border);
         display: flex;
         align-items: center;
         padding: 0 1.75rem;
+        padding: 0 max(1.75rem, var(--safe-right)) 0 max(1.75rem, var(--safe-left));
         gap: .75rem;
         position: sticky;
         top: 0;
         z-index: 50;
+    }
+    /* The frosted backdrop lives on a pseudo-element, not on <nav>: a
+       backdrop-filter makes its element the containing block for every
+       position:fixed descendant, and the phone tab bar is one — it would
+       pin itself to the nav instead of the bottom of the screen. */
+    nav::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: rgba(2,4,8,.88);
         backdrop-filter: blur(24px) saturate(180%);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
     }
@@ -81,10 +100,14 @@
         display: flex;
         gap: .1rem;
         flex: 1;
+        min-width: 0;
     }
 
     .nav-links a {
         position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
         color: var(--muted);
         text-decoration: none;
         font-size: .82rem;
@@ -93,7 +116,10 @@
         border-radius: 7px;
         transition: color .15s, background .15s;
         letter-spacing: -.01em;
+        white-space: nowrap;
     }
+    /* The icons are the tab bar's; the desktop bar is text only. */
+    .nav-links .icon { display: none; }
     .nav-links a:hover  { color: var(--text2); background: rgba(255,255,255,.04); }
     .nav-links a.active { color: var(--text);  background: rgba(255,255,255,.06); }
     .nav-badge {
@@ -105,8 +131,8 @@
         color: #fff;
         font-size: .66rem;
         font-weight: 700;
+        line-height: 1.5;
         text-align: center;
-        vertical-align: text-top;
     }
     .nav-links a.active::after {
         content: '';
@@ -120,12 +146,15 @@
     }
 
     .nav-right {
+        position: relative;
         display: flex;
         align-items: center;
         gap: .6rem;
         flex-shrink: 0;
     }
 
+    /* A button so the narrow layouts can open the account menu from it;
+       on a desktop it only shows who is signed in. */
     .user-chip {
         display: flex;
         align-items: center;
@@ -134,10 +163,13 @@
         background: var(--surf2);
         border: 1px solid var(--border);
         border-radius: 99px;
+        font: inherit;
         font-size: .8rem;
+        line-height: 1.5;
         color: var(--text2);
         letter-spacing: -.01em;
-        transition: border-color .15s;
+        cursor: default;
+        transition: border-color .15s, background .15s;
     }
     .user-chip:hover { border-color: var(--border2); }
 
@@ -149,6 +181,15 @@
         font-size: .62rem; font-weight: 800; color: #fff;
         flex-shrink: 0;
     }
+
+    /* Inline on a desktop: its children sit in .nav-right's row exactly
+       as if the wrapper were not there. */
+    .account-menu { display: contents; }
+    .account-menu-head,
+    .menu-label,
+    .account-menu .nav-admin .icon,
+    .account-menu .nav-logout .icon { display: none; }
+    .nav-logout-form { display: inline; }
 
     /* Icon-only tab: sized off the box, not the (absent) text, so it stays
        square next to the pill-shaped user chip. */
@@ -162,6 +203,7 @@
         border: 1px solid transparent;
         border-radius: 7px;
         transition: all .15s;
+        text-decoration: none;
     }
     .nav-cog svg { display: block; }
     .nav-cog:hover {
@@ -176,6 +218,9 @@
     }
 
     .nav-admin {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
         color: var(--accent);
         text-decoration: none;
         font-weight: 500;
@@ -195,10 +240,17 @@
     }
 
     .nav-logout {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: none;
+        cursor: pointer;
+        font-family: inherit;
         color: var(--danger);
         text-decoration: none;
         font-weight: 500;
         font-size: .78rem;
+        line-height: 1.6;
         padding: .3rem .6rem;
         border: 1px solid rgba(248,81,73,.18);
         border-radius: 7px;
@@ -211,18 +263,91 @@
         border-color: rgba(248,81,73,.4);
         color: #ff7b72;
     }
+    .nav-signin { font-size: .8rem; padding: .3rem .75rem; }
+
+    /* ── Narrow: the account items move into a menu ─────────────────────── */
+    @media (max-width: 1023px) {
+        .user-chip { cursor: pointer; }
+        .nav-right.is-open .user-chip {
+            border-color: var(--border-hi);
+            background: var(--surf3);
+        }
+        .account-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 12px);
+            right: 0;
+            z-index: 80;
+            min-width: 230px;
+            max-width: calc(100vw - 1.5rem);
+            flex-direction: column;
+            gap: .15rem;
+            padding: .4rem;
+            background: rgba(12,16,24,.98);
+            border: 1px solid var(--border2);
+            border-radius: 14px;
+            box-shadow: 0 18px 48px rgba(0,0,0,.6), 0 0 0 1px rgba(124,106,255,.1);
+            transform-origin: top right;
+            animation: menuIn .16s ease;
+        }
+        .nav-right.is-open .account-menu { display: flex; }
+        @keyframes menuIn {
+            from { opacity: 0; transform: translateY(-4px) scale(.98); }
+            to   { opacity: 1; transform: none; }
+        }
+        .account-menu-head {
+            display: block;
+            padding: .5rem .7rem .65rem;
+            margin-bottom: .2rem;
+            border-bottom: 1px solid var(--border);
+            font-size: .75rem;
+            color: var(--muted);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .account-menu-head strong { color: var(--text); font-weight: 600; }
+        .account-menu .menu-label,
+        .account-menu .nav-admin .icon,
+        .account-menu .nav-logout .icon { display: inline; }
+        .account-menu .icon { flex-shrink: 0; }
+        .account-menu .nav-logout-form { display: block; }
+        .account-menu .nav-cog,
+        .account-menu .nav-admin,
+        .account-menu .nav-logout {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: .7rem;
+            width: 100%;
+            height: 44px;
+            padding: 0 .75rem;
+            border: none;
+            border-radius: 9px;
+            font-size: .9rem;
+            font-weight: 500;
+        }
+        .account-menu .nav-cog { color: var(--text2); }
+        .account-menu .nav-cog:hover,
+        .account-menu .nav-cog.active,
+        .account-menu .nav-admin:hover,
+        .account-menu .nav-admin.active { background: rgba(255,255,255,.05); }
+        .account-menu .nav-logout:hover { background: rgba(248,81,73,.1); }
+    }
 
     /* ── LAYOUT ─────────────────────────────────────────────────────────── */
     .container {
         max-width: 1480px;
         margin: 0 auto;
         padding: 1.75rem 1.5rem;
+        padding: 1.75rem max(1.5rem, var(--safe-right)) 1.75rem max(1.5rem, var(--safe-left));
     }
 
     /* ── BUTTONS ─────────────────────────────────────────────────────────── */
     .btn {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: .4rem;
         padding: .5rem 1.1rem;
         border-radius: 8px;
@@ -235,15 +360,23 @@
         white-space: nowrap;
         font-family: inherit;
         letter-spacing: -.01em;
+        /* A bare .btn (Copy, Revoke, Unlink) had no colours of its own and
+           drew as the browser's light-grey default on the dark page. */
+        background: var(--surf2);
+        color: var(--text2);
+        border: 1px solid var(--border);
     }
+    .btn:hover { color: var(--text); border-color: var(--border2); }
+    .btn:active { filter: brightness(.9); }
+    .btn:disabled { opacity: .45; cursor: default; }
     .btn-primary {
         background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
         color: #fff;
+        border: none;
         box-shadow: 0 0 0 1px rgba(124,106,255,.25), 0 3px 12px rgba(124,106,255,.18);
     }
     .btn-primary:hover {
         box-shadow: 0 0 0 1px rgba(124,106,255,.45), 0 4px 20px rgba(124,106,255,.3);
-        transform: translateY(-1px);
         filter: brightness(1.07);
         color: #fff;
     }
@@ -267,6 +400,17 @@
         background: rgba(248,81,73,.1);
         border-color: rgba(248,81,73,.5);
         color: #ff7b72;
+    }
+    /* Lifts only where there is a real hover. On a touch screen :hover
+       sticks after a tap, and the button stayed raised until the next tap
+       somewhere else. */
+    @media (hover: hover) {
+        .btn-primary:hover { transform: translateY(-1px); }
+    }
+    /* A finger needs a bigger target than a cursor. */
+    @media (pointer: coarse) {
+        .btn { min-height: 42px; }
+        .btn-sm { min-height: 38px; }
     }
 
     /* ── PAGE PARTS (shared by several pages) ───────────────────────────── */
@@ -394,7 +538,6 @@
     /* The loading spinners (gallery, feed). */
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── RESPONSIVE (shared) ─────────────────────────────────────────────── */
     /* Visible to assistive tech only. Clipped rather than `display:none`,
        which would take it out of the accessibility tree along with the
        announcement. */
@@ -412,56 +555,92 @@
     /* Nothing should ever be able to force the page wider than the screen */
     img, video, svg { max-width: 100%; }
 
-    @media (max-width: 680px) {
+    /* ── PHONE ───────────────────────────────────────────────────────────── */
+    @media (max-width: 760px) {
+        :root {
+            --nav-h: 54px;
+            --tabbar-h: calc(58px + var(--safe-bottom));
+        }
+
+        /* Top bar: the brand on the left, the account button on the right. */
         nav {
-            /* Height deliberately untouched here: --nav-h drives the feed's
-               slide sizing, and changing it per-breakpoint would desync the
-               scroll-snap boundaries. Pad instead. */
-            padding: 0 .85rem;
-            gap: .35rem;
+            padding: 0 max(.9rem, var(--safe-right)) 0 max(.9rem, var(--safe-left));
+            gap: .5rem;
         }
-        .brand-name { display: none; }
         .nav-sep { display: none; }
+        .nav-right { margin-left: auto; }
+        .user-chip {
+            padding: 0;
+            border-radius: 50%;
+            border-color: transparent;
+            background: none;
+        }
+        .user-chip .user-name { display: none; }
+        .user-chip .user-avatar {
+            width: 34px; height: 34px;
+            font-size: .85rem;
+            box-shadow: 0 0 0 2px rgba(255,255,255,.08);
+        }
+        .nav-right.is-open .user-chip { background: none; }
+        .nav-right.is-open .user-chip .user-avatar { box-shadow: 0 0 0 2px var(--accent); }
+        .account-menu { right: -.2rem; top: calc(100% + 10px); }
 
-        /* Let the links shrink and scroll horizontally instead of pushing
-           the user chip / sign-out off the edge of the screen. */
+        /* Tab bar: the page links, pinned to the bottom edge, clear of the
+           home indicator. */
         .nav-links {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 60;
+            height: var(--tabbar-h);
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: 1fr;
             gap: 0;
-            min-width: 0;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
+            padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+            background: rgba(6,9,15,.94);
+            border-top: 1px solid var(--border);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
         }
-        .nav-links::-webkit-scrollbar { display: none; }
         .nav-links a {
-            padding: .35rem .5rem;
-            font-size: .8rem;
-            white-space: nowrap;
+            flex-direction: column;
+            justify-content: center;
+            gap: 3px;
+            padding: 0;
+            border-radius: 0;
+            font-size: .66rem;
+            font-weight: 500;
+            letter-spacing: 0;
+            color: var(--muted);
+        }
+        .nav-links .icon { display: block; }
+        .nav-links a:hover { background: none; color: var(--muted); }
+        .nav-links a:active { color: var(--text2); }
+        .nav-links a.active { background: none; color: var(--text); }
+        .nav-links a.active .icon { color: #a99bff; }
+        .nav-links a.active::after {
+            top: 0; bottom: auto;
+            width: 28px;
+        }
+        .nav-links .nav-badge {
+            position: absolute;
+            top: 6px;
+            left: calc(50% + 5px);
+            font-size: .6rem;
+            min-width: 1.05rem;
+            padding: 0 .28rem;
+            box-shadow: 0 0 0 2px rgba(6,9,15,.94);
         }
 
-        .nav-right { gap: .4rem; min-width: 0; }
-        .user-chip {
-            max-width: 34vw;
-            min-width: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        /* Clear the tab bar at the end of every page. */
+        .container {
+            padding: 1.1rem max(.85rem, var(--safe-right)) calc(var(--tabbar-h) + 1.5rem) max(.85rem, var(--safe-left));
         }
-    }
-
-    @media (max-width: 430px) {
-        /* Collapse the user chip down to just the avatar to reclaim width */
-        .user-chip {
-            gap: 0;
-            padding: .28rem;
-            font-size: 0;           /* hides the username text node */
-        }
-        .user-chip .user-avatar { font-size: .62rem; }  /* keep the initial */
-        .nav-logout { padding: .3rem .5rem; }
-        .nav-admin  { padding: .3rem .5rem; }
-        .nav-cog    { width: 28px; height: 28px; }
+        .page-header { margin-bottom: 1.1rem; gap: .75rem; }
+        .page-title { font-size: 1.25rem; }
+        .page-sub { font-size: .8rem; }
+        .panel-card { padding: 1rem; border-radius: 12px; }
+        .info-card { padding: 1rem 1.05rem; border-radius: 12px; }
     }
 
     /* ── TAG AUTOCOMPLETE (js/tag-autocomplete.js) ──────────────────────── */
@@ -494,4 +673,9 @@
     .tag-ac-item.active {
         background: rgba(124,106,255,.18);
         color: var(--text);
+    }
+    /* Suggestions are tapped, not pointed at: give each one a finger's
+       height. */
+    @media (pointer: coarse) {
+        .tag-ac-item { padding: .7rem .85rem; font-size: .92rem; }
     }

@@ -35,7 +35,7 @@ a login, and every query only returns private items to their owner.
 | `GET /` | Gallery. Query: `search`, `exclude_tags`, `type` (`all`, `image`, `gif`, `video`), `sort` (`newest`, `oldest`, `random`), `hide_ai`, `private_only=1` |
 | `GET /feed` | Feed |
 | `GET /tags` | Tag list |
-| `GET`, `POST /upload` | Upload page, and the upload form's target |
+| `GET`, `POST /upload` | Upload page, and the upload form's target. The page posts with `X-Requested-With: XMLHttpRequest` to show progress, and gets JSON back instead of a redirect: `messages` (each a `category` and `text`) and `counts` (`ok`, `duplicate`, `error`). |
 | `GET /queue` | **Untagged**: the WebDAV inbox queue and the app password |
 | `GET /settings` | Settings: password, Telegram and Discord linking |
 | `POST /settings/password` | Change your password: form fields `current_password`, `new_password` and `confirm_password`. 5 per minute. |
@@ -49,12 +49,12 @@ a login, and every query only returns private items to their owner.
 | Route | Purpose |
 |---|---|
 | `GET /media/<file>`, `GET /thumbs/<file>` | A media file or thumbnail. Private files are decrypted on the fly, with `Range` support. |
-| `GET /mediadata/<id>` | One item's details as JSON |
+| `GET /mediadata/<id>` | One item's details as JSON, including `can_edit`: whether you may edit or delete it |
 | `GET /api/media` | A gallery page as JSON, for infinite scrolling. Same query as `/`, plus `page` and `sort_seed` for random order. |
 | `GET /api/feed` | A feed page as JSON. Query: `types`, `search`, `include_tags`, `exclude_tags`, `hide_ai`, `seed`, `page`. |
 | `GET /api/tags` | Every tag the user can see, for suggestions |
-| `POST /edit/<id>` | Set an item's tags (owner or admin) |
-| `POST /delete/<id>` | Delete an item (owner or admin) |
+| `POST /edit/<id>` | Set an item's tags (owner or admin). A scripted call (`X-Requested-With: XMLHttpRequest`) gets `{"updated": true, "tags": …}` with the tags as stored, or a 403. |
+| `POST /delete/<id>` | Delete an item (owner or admin). A scripted call gets `{"deleted": true}`, or a 403. |
 | `POST /edit-bulk` | Add or remove tags on several items; JSON body with `ids` |
 | `POST /delete-bulk` | Delete several items; JSON body with `ids` |
 | `POST /privacy-bulk` | Make several items private or public; JSON body with `ids` |

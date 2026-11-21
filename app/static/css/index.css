@@ -11,11 +11,26 @@
         border-radius: var(--r);
     }
 
-    .search-group {
-        display: flex;
-        gap: .4rem;
-        flex: 1;
-        min-width: 200px;
+    /* Layout-free on a wide screen: their children are the toolbar's flex
+       items, in one wrapping row. The phone block below gives them a
+       layout of their own. */
+    .toolbar-main,
+    .toolbar-filters { display: contents; }
+    .search-wrap { min-width: 200px; flex: 1.2; }
+    /* The Filters button only exists for the folded phone layout. */
+    .toolbar-filter-btn { display: none; }
+    /* Select ends the row, after Search and Reset, as it always has. */
+    #select-toggle { order: 1; }
+    .filter-count {
+        min-width: 1.1rem;
+        padding: 0 .3rem;
+        border-radius: 99px;
+        background: var(--accent);
+        color: #fff;
+        font-size: .68rem;
+        font-weight: 700;
+        line-height: 1.1rem;
+        text-align: center;
     }
 
     .input-wrap {
@@ -49,6 +64,8 @@
         letter-spacing: -.01em;
     }
     .input-wrap input { padding-left: 2.2rem; }
+    .toolbar input[type="search"] { -webkit-appearance: none; appearance: none; }
+    .toolbar input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; }
     .toolbar input:focus,
     .toolbar select:focus {
         outline: none;
@@ -56,7 +73,10 @@
         box-shadow: 0 0 0 3px rgba(124,106,255,.1);
         background: var(--surf3);
     }
+    /* Sized to their options, not width:100% — as flex items at full width
+       each select took a line of its own and the toolbar ran four rows. */
     .toolbar select {
+        width: auto;
         min-width: 130px;
         cursor: pointer;
         appearance: none;
@@ -261,14 +281,20 @@
         cursor: pointer;
         transition: border-color .2s, transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s;
     }
-    .gallery-item:hover {
-        border-color: rgba(124,106,255,.45);
-        transform: translateY(-3px);
-        box-shadow:
-            0 16px 40px rgba(0,0,0,.55),
-            0 0 0 1px rgba(124,106,255,.2),
-            0 0 30px rgba(124,106,255,.08);
+    /* Lift and zoom on a real hover only: on a touch screen :hover sticks
+       to the last card tapped, which left it raised behind the lightbox. */
+    @media (hover: hover) {
+        .gallery-item:hover {
+            border-color: rgba(124,106,255,.45);
+            transform: translateY(-3px);
+            box-shadow:
+                0 16px 40px rgba(0,0,0,.55),
+                0 0 0 1px rgba(124,106,255,.2),
+                0 0 30px rgba(124,106,255,.08);
+        }
+        .gallery-item:hover .thumb { transform: scale(1.05); }
     }
+    .gallery-item:active { border-color: rgba(124,106,255,.45); }
 
     .thumb-wrapper {
         aspect-ratio: 1;
@@ -282,7 +308,6 @@
         display: block;
         transition: transform .35s cubic-bezier(.4,0,.2,1);
     }
-    .gallery-item:hover .thumb { transform: scale(1.05); }
 
     /* Type badge */
     .type-badge {
@@ -301,6 +326,10 @@
         backdrop-filter: blur(6px);
     }
     .gallery-item:hover .type-badge { opacity: 1; transform: translateY(0); }
+    /* No hover to reveal it on a touch screen: always show it there. */
+    @media (hover: none) {
+        .type-badge { opacity: 1; transform: none; }
+    }
     .type-badge.video { background: rgba(92,124,255,.7); color: #c0cfff; border: 1px solid rgba(92,124,255,.3); }
     .type-badge.gif   { background: rgba(168,85,247,.7); color: #e8c5ff; border: 1px solid rgba(168,85,247,.3); }
     .type-badge.image  { background: rgba(20,160,120,.7); color: #a0f0d8; border: 1px solid rgba(20,160,120,.3); }
@@ -522,6 +551,16 @@
         font-family: inherit;
     }
     .modal-btn:hover { color: var(--text); border-color: var(--border2); background: var(--surf3); }
+    .modal-btn .icon { display: block; flex-shrink: 0; }
+    .modal-btn-label:empty { display: none; }
+    #modal-download-name {
+        max-width: 22ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .modal-delete-btn { color: var(--danger); border-color: rgba(248,81,73,.25); }
+    .modal-delete-btn:hover { color: #ff7b72; border-color: rgba(248,81,73,.5); background: rgba(248,81,73,.1); }
     .modal-close {
         width: 28px; height: 28px; padding: 0;
         background: var(--surf2);
@@ -535,6 +574,8 @@
         font-family: inherit;
     }
     .modal-close:hover { background: rgba(248,81,73,.15); border-color: rgba(248,81,73,.3); color: var(--danger); }
+    .modal-close .icon,
+    .modal-nav .icon { display: block; }
     .modal-body {
         overflow: auto;
         flex: 1;
@@ -559,6 +600,7 @@
         font-size: 1.5rem;
         line-height: 1;
         cursor: pointer;
+        padding: 0;
         display: flex; align-items: center; justify-content: center;
         backdrop-filter: blur(8px);
         transition: background .15s, opacity .15s;
@@ -606,12 +648,44 @@
         border-top: 1px solid var(--border);
         flex-shrink: 0;
     }
+    .modal-tags-row {
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+    }
     .modal-tags {
         display: flex;
         flex-wrap: wrap;
         gap: .25rem;
         font-size: .8rem;
+        flex: 1;
+        min-width: 0;
     }
+    .modal-edit-btn { flex-shrink: 0; padding: .22rem .6rem; font-size: .76rem; white-space: nowrap; }
+    /* The inline tag editor (index.js) takes the tag row's place. */
+    .modal-edit {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .modal-edit-wrap { position: relative; flex: 1; min-width: 200px; }
+    .modal-edit input {
+        width: 100%;
+        background: var(--surf2);
+        color: var(--text);
+        border: 1px solid var(--border2);
+        border-radius: 8px;
+        padding: .45rem .7rem;
+        font-size: .845rem;
+        font-family: inherit;
+    }
+    .modal-edit input:focus { outline: none; border-color: var(--border-hi); }
+    .modal-edit-btns { display: flex; gap: .4rem; }
+    /* The page behind the lightbox must not scroll under the finger that
+       is swiping through the pictures. */
+    html.modal-open,
+    html.modal-open body { overflow: hidden; }
     .modal-tag-label {
         color: var(--muted);
         margin-right: .25rem;
@@ -652,21 +726,231 @@
         border-radius: 50%;
         animation: spin .65s linear infinite;
     }
-    @media (max-width: 680px) {
-        .container { padding: 1rem; }
-        .toolbar { padding: .6rem .75rem; }
-        .search-group { flex-wrap: wrap; }
-        .toolbar-actions { flex: 1; }
-        .toolbar-actions .btn { flex: 1; justify-content: center; }
-        .gallery { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .6rem; }
+    /* ── PHONE ───────────────────────────────────────────────────────────── */
+    @media (max-width: 760px) {
+        /* Toolbar: search, Filters and Select on one row; the rest folds
+           away under Filters (index.js toggles .filters-open). */
+        .toolbar {
+            display: block;
+            padding: .55rem;
+            margin-bottom: 1rem;
+            border-radius: 14px;
+        }
+        .toolbar-main {
+            display: flex;
+            gap: .4rem;
+            align-items: center;
+        }
+        .search-wrap { flex: 1; min-width: 0; }
+        .toolbar-filter-btn { display: inline-flex; position: relative; }
+        .toolbar-main .btn {
+            flex-shrink: 0;
+            height: 44px;
+            min-height: 44px;
+            padding: 0 .7rem;
+        }
+        .toolbar-main .toolbar-btn-label { display: none; }
+        /* In select mode the toggle reads "Done": an icon alone would not
+           say how to get out. */
+        body.select-mode #select-toggle .icon { display: none; }
+        body.select-mode #select-toggle .toolbar-btn-label { display: inline; }
+        .toolbar-main .btn .icon { display: block; }
+        .filter-count {
+            position: absolute;
+            top: -5px; right: -5px;
+            box-shadow: 0 0 0 2px var(--surface);
+        }
+        .has-filters .toolbar-filter-btn { color: var(--text2); border-color: rgba(124,106,255,.4); }
+        .toolbar input,
+        .toolbar select { height: 44px; border-radius: 10px; }
 
-        /* Modal: let the header wrap and shrink so the action buttons
-           never spill past the edge of the screen. */
-        .modal-bg { padding: .75rem; }
-        .modal-header { flex-wrap: wrap; gap: .4rem; padding: .6rem .75rem; }
-        .modal-header-actions { gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
-        .modal-btn { padding: .3rem .55rem; font-size: .76rem; }
-        .modal-body { padding: .6rem; }
-        .modal-media { max-height: 64vh; }
-        .modal-footer { padding: .6rem .75rem; }
+        .toolbar-filters {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: .5rem;
+            padding-top: .55rem;
+            margin-top: .55rem;
+            border-top: 1px solid var(--border);
+        }
+        .toolbar.filters-open .toolbar-filters { display: grid; }
+        .toolbar.filters-open .toolbar-filter-btn {
+            color: var(--accent);
+            background: rgba(124,106,255,.1);
+            border-color: rgba(124,106,255,.45);
+        }
+        .exclude-wrap,
+        .toolbar-filters .toolbar-actions { grid-column: 1 / -1; }
+        .toolbar select { width: 100%; min-width: 0; }
+        .ai-toggle {
+            justify-content: flex-start;
+            min-height: 44px;
+            min-width: 0;
+            border-radius: 10px;
+            font-size: .82rem;
+            white-space: normal;
+            line-height: 1.25;
+        }
+        .toolbar-actions { gap: .5rem; }
+        .toolbar-actions .btn { flex: 1; height: 44px; }
+
+        /* Grid: two columns of square thumbnails, tags kept to two lines.
+           Editing and deleting live in the lightbox on a phone — the
+           corner buttons covered a third of every thumbnail. */
+        .gallery {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: .55rem;
+        }
+        .gallery-item { border-radius: 10px; }
+        .action-buttons,
+        .edit-form { display: none !important; }
+        .card-body { padding: .45rem .5rem .5rem; }
+        /* Two rows of one-line pills at most: a fixed pill height makes
+           the cut fall between rows, never through one. */
+        .card-tags {
+            gap: 3px;
+            min-height: 0;
+            max-height: calc(2 * 20px + 3px);
+            overflow: hidden;
+        }
+        .card-tags .tag-pill {
+            height: 20px;
+            line-height: 18px;
+            font-size: .66rem;
+            padding: 0 .4em;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: block;
+        }
+        .type-badge { font-size: .6rem; bottom: .35rem; left: .35rem; }
+        .type-badge.private { top: .35rem; left: .35rem; }
+        .empty { padding: 4em 1em; }
+
+        /* Select mode: the checkbox gets a finger-sized corner. */
+        body.select-mode .thumb-wrapper::after {
+            top: .4rem; left: .4rem;
+            width: 24px; height: 24px;
+            border-radius: 7px;
+        }
+        body.select-mode .type-badge.private { left: 2.6rem; }
+
+        /* Bulk bar: docked over the tab bar, one row — the count, then
+           the actions in a strip that scrolls sideways. */
+        .bulk-bar {
+            left: 0; right: 0;
+            bottom: var(--tabbar-h);
+            transform: none;
+            width: auto;
+            max-width: none;
+            border-radius: 14px 14px 0 0;
+            border-left: none; border-right: none; border-bottom: none;
+            padding: .55rem max(.75rem, var(--safe-right)) .6rem max(.75rem, var(--safe-left));
+            gap: .45rem;
+            flex-wrap: wrap;
+            animation-name: bulkBarUp;
+        }
+        @keyframes bulkBarUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: none; }
+        }
+        .bulk-bar:has(.bulk-tag-editor.active) { width: auto; }
+        .bulk-count { flex-basis: 100%; font-size: .8rem; color: var(--muted); }
+        .bulk-actions {
+            flex: 1;
+            min-width: 0;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            margin: 0 -.2rem;
+            padding: 0 .2rem;
+        }
+        .bulk-actions::-webkit-scrollbar { display: none; }
+        .bulk-actions .btn { flex-shrink: 0; height: 40px; min-height: 40px; padding: 0 .8rem; font-size: .82rem; }
+        /* "Done" in the toolbar already leaves select mode. */
+        .bulk-cancel-btn { display: none; }
+        .bulk-tag-editor { gap: .4rem; }
+        .bulk-tag-wrap { min-width: 0; }
+        .bulk-tag-editor input { height: 44px; }
+        .bulk-tag-editor .btn { height: 44px; }
+        body.select-mode .gallery { padding-bottom: 7rem; }
+
+        /* Lightbox: the whole screen, black behind the picture, controls
+           as icons, clear of the notch and the home indicator. */
+        .modal-bg { padding: 0; background: #000; backdrop-filter: none; -webkit-backdrop-filter: none; }
+        .modal-box {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            max-height: none;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            background: #000;
+            animation: none;
+        }
+        .modal-header {
+            flex-wrap: nowrap;
+            gap: .4rem;
+            padding: calc(.45rem + var(--safe-top)) max(.6rem, var(--safe-right)) .45rem max(.75rem, var(--safe-left));
+            border-bottom: none;
+            background: rgba(8,10,16,.9);
+        }
+        .modal-title { display: none; }
+        .modal-header-actions { gap: .35rem; width: 100%; justify-content: flex-end; flex-wrap: nowrap; }
+        .modal-btn-label { display: none; }
+        /* Header buttons only: the footer's "Edit tags" is a .modal-btn too
+           and keeps its label, so it must not be squeezed into a square. */
+        .modal-header .modal-btn,
+        .modal-close {
+            width: 42px; height: 42px;
+            padding: 0;
+            justify-content: center;
+            border-radius: 10px;
+        }
+        /* Close sits apart, at the edge a right thumb reaches first. */
+        .modal-close { margin-left: .4rem; }
+        /* The swipes are index.js's: no browser scroll, pinch or
+           pull-to-refresh competing for the same finger. */
+        .modal-body {
+            padding: 0;
+            background: #000;
+            touch-action: none;
+            overscroll-behavior: contain;
+        }
+        .modal-view-content:not(.zoom-viewport) {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-media {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+            object-fit: contain;
+        }
+        .modal-nav {
+            width: 36px; height: 36px;
+            background: rgba(8,10,18,.45);
+            border-color: rgba(255,255,255,.1);
+        }
+        .modal-nav-prev { left: .35rem; }
+        .modal-nav-next { right: .35rem; }
+        .modal-footer {
+            padding: .6rem max(.85rem, var(--safe-right)) calc(.7rem + var(--safe-bottom)) max(.85rem, var(--safe-left));
+            border-top: none;
+            background: rgba(8,10,16,.9);
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        .modal-tags { gap: .3rem; }
+        .modal-tags .tag-pill { font-size: .74rem; padding: .15em .55em; }
+        .modal-edit-btn { height: 36px; padding: 0 .75rem; gap: .4rem; font-size: .8rem; }
+        .modal-edit-wrap { flex-basis: 100%; min-width: 0; }
+        .modal-edit input { height: 44px; }
+        .modal-edit-btns { flex: 1; }
+        .modal-edit-btns .btn { flex: 1; height: 42px; }
     }

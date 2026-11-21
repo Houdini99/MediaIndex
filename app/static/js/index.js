@@ -99,12 +99,19 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
     });
 
     /* ── Modal ── */
+    //: The /mediadata answer for the item on screen: its tags seed the
+    //  in-lightbox editor, can_edit decides whether Edit and Delete show.
+    let modalData = null;
+
     function openModal(id) {
         fetch('/mediadata/' + id).then(r => r.json()).then(d => {
+            if (d.error) return;
             const modal    = document.getElementById('modal-bg');
+            const wasOpen  = modal.classList.contains('active');
             const isVideo  = d.type === 'video';
             const container = modal.querySelector('.modal-view-content');
             zoom.out();           // clear any zoom left over from the last image
+            resetSwipe(false);    // a swipe that carried the last one away
             container.innerHTML = '';
             const el = document.createElement(isVideo ? 'video' : 'img');
             el.className = 'modal-media';
@@ -120,34 +127,149 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
             }
             container.appendChild(el);
 
-            /* Tags in footer */
-            const footer = modal.querySelector('.modal-tags');
-            footer.innerHTML = d.tags
-                ? '<span class="modal-tag-label">Tags:</span>' + MI.tagPills(d.tags)
-                : NO_TAGS;
+            modalData = d;
+            closeModalEdit();
+            renderModalTags(d.tags);
 
             const dl = document.getElementById('modal-download');
             dl.href = d.filepath;
             dl.setAttribute('download', d.download_name);
-            dl.textContent = '↓ ' + d.download_name;
+            dl.title = 'Download ' + d.download_name;
+            document.getElementById('modal-download-name').textContent = d.download_name;
+
+            // The server refuses anyone else's edit or delete; offering the
+            // buttons regardless made the refusal look like a broken page.
+            modal.querySelector('.modal-delete-btn').hidden = !d.can_edit;
+            modal.querySelector('.modal-edit-btn').hidden = !d.can_edit;
 
             modal.dataset.currentId = id;
-            modal.classList.add('active');
+            if (!wasOpen) {
+                modal.classList.add('active');
+                document.documentElement.classList.add('modal-open');
+                pushLightboxHistory();
+            }
             updateModalNavButtons();
             if (slideshowOn) scheduleSlideshowAdvance();
-        });
+        }).catch(() => resetSwipe(true));
+    }
+
+    function renderModalTags(tags) {
+        const footer = document.querySelector('#modal-bg .modal-tags');
+        footer.innerHTML = tags
+            ? '<span class="modal-tag-label">Tags:</span>' + MI.tagPills(tags)
+            : NO_TAGS;
+    }
+
+    /* ── Lightbox ↔ browser history ─────────────────────────────────────
+     * On a phone the system Back gesture is how anything gets closed. With
+     * no history entry of its own, Back left the gallery altogether — and
+     * with it every page infinite scroll had loaded. Opening pushes an
+     * entry, Back (popstate) closes, and every other way of closing goes
+     * through history.back() so the entry never outlives the lightbox.
+     */
+    const LIGHTBOX_STATE = 'miLightbox';
+
+    function pushLightboxHistory() {
+        if (!(history.state && history.state[LIGHTBOX_STATE])) {
+            history.pushState({ [LIGHTBOX_STATE]: true }, '');
+        }
     }
 
     function closeModal() {
+        if (history.state && history.state[LIGHTBOX_STATE]) history.back();   // → popstate
+        else closeModalNow();
+    }
+
+    function closeModalNow() {
         stopSlideshow();
         zoom.out();
+        resetSwipe(false);
+        closeModalEdit();
+        modalData = null;
         const modal = document.getElementById('modal-bg');
         modal.classList.remove('active');
+        document.documentElement.classList.remove('modal-open');
         // Stop video playback
         const v = modal.querySelector('video');
         if (v) { v.pause(); v.src = ''; }
         modal.querySelector('.modal-view-content').innerHTML = '';
         modal.querySelector('.modal-tags').innerHTML = '';
+    }
+
+    window.addEventListener('popstate', () => {
+        const modal = document.getElementById('modal-bg');
+        if (modal && modal.classList.contains('active')) closeModalNow();
+    });
+    // A reload (bulk actions end in one) keeps the entry but not the open
+    // lightbox; drop the marker so the next Back is a real one.
+    if (history.state && history.state[LIGHTBOX_STATE]) history.replaceState(null, '');
+
+    /* ── Tags: edit in place ────────────────────────────────────────────
+     * Both editors — the card's (desktop) and the lightbox's (every width,
+     * and the only one on a phone) — save through here. The route answers
+     * scripted callers with the tags as stored, normalized, so the card is
+     * redrawn from those rather than reloading the page and losing every
+     * page infinite scroll had loaded.
+     */
+    function saveTags(id, value) {
+        const fd = new FormData();
+        fd.append('tags', value.trim());
+        return MI.post(`/edit/${id}`, fd)
+            .then(r => r.json().catch(() => ({ updated: false })))
+            .then(data => {
+                if (!data.updated) throw new Error('refused');
+                const tags = data.tags || '';
+                updateCardTags(id, tags);
+                return tags;
+            });
+    }
+
+    function updateCardTags(id, tags) {
+        document.querySelectorAll(`.gallery-item[data-id="${id}"]`).forEach(card => {
+            const pills = card.querySelector('.card-tags');
+            if (pills) pills.innerHTML = MI.tagPills(tags, NO_TAGS);
+            const input = card.querySelector('.edit-form input');
+            if (input) input.value = tags;
+        });
+    }
+
+    function openModalEdit() {
+        if (!modalData) return;
+        stopSlideshow();
+        zoom.out();
+        const input = document.getElementById('modal-edit-input');
+        // Ready to add to: the existing tags, then a separator and the caret.
+        const tags = (modalData.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+        input.value = tags.length ? tags.join(', ') + ', ' : '';
+        document.querySelector('#modal-bg .modal-tags-row').hidden = true;
+        document.getElementById('modal-edit').hidden = false;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    function closeModalEdit() {
+        const edit = document.getElementById('modal-edit');
+        if (!edit || edit.hidden) return false;
+        edit.hidden = true;
+        document.querySelector('#modal-bg .modal-tags-row').hidden = false;
+        return true;
+    }
+
+    function saveModalEdit() {
+        if (!modalData) return;
+        const id = modalData.id;
+        const btn = document.getElementById('modal-edit-save');
+        btn.disabled = true;
+        saveTags(id, document.getElementById('modal-edit-input').value)
+            .then(tags => {
+                if (modalData && modalData.id === id) {
+                    modalData.tags = tags;
+                    renderModalTags(tags);
+                }
+                closeModalEdit();
+            })
+            .catch(() => alert('Could not save the tags — the file may not be yours.'))
+            .finally(() => { btn.disabled = false; });
     }
 
     /* ── Preview zoom ────────────────────────────────────────────────────
@@ -203,6 +325,85 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
             const bg = document.getElementById('modal-bg');
             if (bg) bg.classList.remove('zoom-active');
         },
+    });
+
+    /* ── Lightbox swipe (touch) ─────────────────────────────────────────
+     * Sideways moves to the neighbour, down closes, and the picture follows
+     * the finger so the gesture shows what it will do before it does it.
+     * Nothing here runs while zoomed: a drag then pans (MI.zoom). On a
+     * phone .modal-body is touch-action:none (index.css), so the browser
+     * neither scrolls nor pull-to-refreshes underneath the gesture.
+     */
+    const SWIPE_COMMIT = 60;    // px sideways to change picture
+    const SWIPE_CLOSE  = 110;   // px down to close
+    let swipe = null;
+
+    function swipeTarget() {
+        return document.querySelector('#modal-bg .modal-view-content');
+    }
+
+    function resetSwipe(animated) {
+        swipe = null;
+        const vp = swipeTarget();
+        if (!vp) return;
+        vp.style.transition = animated ? 'transform .2s ease-out, opacity .2s ease-out' : '';
+        vp.style.transform = '';
+        vp.style.opacity = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const body = document.querySelector('#modal-bg .modal-body');
+        if (!body) return;
+        body.addEventListener('touchstart', e => {
+            swipe = null;
+            if (e.touches.length !== 1 || zoom.scale) return;
+            const t = e.touches[0];
+            // A video's own controls take the drags along its bottom edge.
+            if (e.target.tagName === 'VIDEO') {
+                const r = e.target.getBoundingClientRect();
+                if (t.clientY > r.bottom - 72) return;
+            }
+            swipe = { x: t.clientX, y: t.clientY, dx: 0, dy: 0, axis: null };
+        }, { passive: true });
+
+        body.addEventListener('touchmove', e => {
+            if (!swipe || zoom.scale || e.touches.length !== 1) return;
+            const t = e.touches[0];
+            swipe.dx = t.clientX - swipe.x;
+            swipe.dy = t.clientY - swipe.y;
+            if (!swipe.axis && Math.hypot(swipe.dx, swipe.dy) > 10) {
+                swipe.axis = Math.abs(swipe.dx) > Math.abs(swipe.dy) ? 'x' : 'y';
+            }
+            const vp = swipeTarget();
+            vp.style.transition = 'none';
+            if (swipe.axis === 'x') {
+                vp.style.transform = `translateX(${swipe.dx}px)`;
+            } else if (swipe.axis === 'y' && swipe.dy > 0) {
+                vp.style.transform = `translateY(${swipe.dy}px) scale(${Math.max(.85, 1 - swipe.dy / 1500)})`;
+                vp.style.opacity = String(Math.max(.35, 1 - swipe.dy / 450));
+            }
+        }, { passive: true });
+
+        body.addEventListener('touchend', () => {
+            const s = swipe;
+            swipe = null;
+            if (!s || !s.axis || zoom.scale) return;
+            if (s.axis === 'x' && Math.abs(s.dx) > SWIPE_COMMIT) {
+                const dir = s.dx < 0 ? 1 : -1;
+                const vp = swipeTarget();
+                vp.style.transition = 'transform .16s ease-in, opacity .16s ease-in';
+                vp.style.transform = `translateX(${dir > 0 ? -60 : 60}%)`;
+                vp.style.opacity = '0';
+                // openModal() puts it back once the neighbour has loaded;
+                // at either end of the gallery there is none, so spring back.
+                if (!modalNav(dir)) resetSwipe(true);
+            } else if (s.axis === 'y' && s.dy > SWIPE_CLOSE) {
+                closeModal();
+            } else {
+                resetSwipe(true);
+            }
+        });
+        body.addEventListener('touchcancel', () => resetSwipe(true));
     });
 
     /* ── Lightbox navigation ── */
@@ -272,11 +473,21 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         slideshowOn ? stopSlideshow() : startSlideshow();
     }
 
+    function setSlideshowButton(on) {
+        const btn = document.getElementById('modal-slideshow');
+        if (!btn) return;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.setAttribute('aria-label', on ? 'Stop slideshow' : 'Start slideshow');
+        btn.querySelector('[data-ss-play]').hidden = on;
+        btn.querySelector('[data-ss-pause]').hidden = !on;
+        document.getElementById('modal-slideshow-label').textContent = on ? 'Stop' : 'Slideshow';
+    }
+
     function startSlideshow() {
         slideshowOn = true;
-        const btn = document.getElementById('modal-slideshow');
-        btn.textContent = '⏸ Stop';
-        btn.classList.add('active');
+        setSlideshowButton(true);
+        closeModalEdit();
         scheduleSlideshowAdvance();
     }
 
@@ -285,11 +496,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         slideshowOn = false;
         clearTimeout(slideshowTimer);
         slideshowTimer = null;
-        const btn = document.getElementById('modal-slideshow');
-        if (btn) {
-            btn.textContent = '▶ Slideshow';
-            btn.classList.remove('active');
-        }
+        setSlideshowButton(false);
     }
 
     function modalDelete() {
@@ -306,7 +513,8 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         document.body.classList.toggle('select-mode', selectMode);
         const toggle = document.getElementById('select-toggle');
         toggle.classList.toggle('active', selectMode);
-        toggle.textContent = selectMode ? '✕ Done' : '☑ Select';
+        toggle.setAttribute('aria-pressed', selectMode ? 'true' : 'false');
+        document.getElementById('select-toggle-label').textContent = selectMode ? 'Done' : 'Select';
         if (selectMode) {
             // Open edit forms would swallow the selection clicks.
             document.querySelectorAll('.edit-form').forEach(f => f.classList.remove('active'));
@@ -348,7 +556,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
             .then(r => { if (r.ok) location.reload(); else throw new Error(); })
             .catch(() => {
                 alert('Error deleting files.');
-                btn.textContent = '🗑 Delete selected';
+                btn.textContent = '🗑 Delete';
                 updateBulkBar();
             });
     }
@@ -405,6 +613,9 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         document.getElementById('bulk-tag-input').addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); applyBulkTagEdit(); }
         });
+        document.getElementById('modal-edit-input').addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); saveModalEdit(); }
+        });
     });
 
     // Capture-phase: in select mode a click anywhere on a card toggles its
@@ -429,6 +640,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             if (zoom.scale) zoom.out();
+            else if (closeModalEdit()) { /* the editor was the top layer */ }
             else if (document.getElementById('modal-bg').classList.contains('active')) closeModal();
             else if (bulkTagMode) closeBulkTagEditor();
             else if (selectMode) toggleSelectMode();
@@ -450,17 +662,42 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
     }
     function saveEditedTags(id) {
         const input = document.getElementById('edit-input-' + id);
-        const fd = new FormData();
-        fd.append('tags', input.value.trim());
-        MI.post(`/edit/${id}`, fd)
-            .then(r => { if (r.ok) location.reload(); else alert('Error saving.'); })
-            .catch(() => alert('Error saving.'));
+        saveTags(id, input.value)
+            .then(() => hideEditForm(id))
+            .catch(() => alert('Could not save the tags — the file may not be yours.'));
     }
+
+    /* Removed in place, like a tag edit: a reload threw away every page
+     * infinite scroll had loaded and, from the lightbox, the place in it.
+     * `/delete/<id>` answers scripted callers with JSON and a 403 when the
+     * row is not yours. */
     function deleteMedia(id) {
         if (!confirm('Are you sure you want to delete this file?')) return;
         MI.post(`/delete/${id}`)
-            .then(r => { if (r.ok) location.reload(); else alert('Error deleting file.'); })
-            .catch(() => alert('Error deleting file.'));
+            .then(r => r.json().catch(() => ({ deleted: false })))
+            .then(data => {
+                if (!data.deleted) throw new Error('refused');
+                removeCard(+id);
+            })
+            .catch(() => alert('Could not delete this file — it may not be yours.'));
+    }
+
+    /* Drop a card; if the lightbox was showing it, move on to its
+     * neighbour (the next one, else the previous), or close when it was
+     * the last. */
+    function removeCard(id) {
+        const modal = document.getElementById('modal-bg');
+        const showing = modal.classList.contains('active') && +modal.dataset.currentId === id;
+        let neighbour = null;
+        if (showing) {
+            const { ids, idx } = modalIndex();
+            if (idx !== -1) neighbour = ids[idx + 1] !== undefined ? ids[idx + 1] : (ids[idx - 1] !== undefined ? ids[idx - 1] : null);
+        }
+        document.querySelectorAll(`.gallery-item[data-id="${id}"]`).forEach(el => el.remove());
+        if (selectedIds.delete(id)) updateBulkBar();
+        if (!showing) return;
+        if (neighbour !== null) openModal(neighbour);
+        else closeModal();
     }
 
     /* ── Delegated action wiring ────────────────────────────────────────
@@ -490,6 +727,18 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
     MI.on('modal-prev',  () => modalNav(-1));
     MI.on('modal-next',  () => modalNav(1));
     MI.on('zoom',        (el, ev) => zoom.scale ? zoom.out() : zoom.in(ev, el));
+    MI.on('modal-edit',        () => openModalEdit());
+    MI.on('modal-edit-cancel', () => closeModalEdit());
+    MI.on('modal-edit-save',   () => saveModalEdit());
+
+    // Phone toolbar: the filters beyond the search box fold away behind a
+    // button (index.css). On a wide screen the button is not shown.
+    MI.on('toggle-filters', el => {
+        const form = el.closest('form');
+        const open = !form.classList.contains('filters-open');
+        form.classList.toggle('filters-open', open);
+        el.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
 
     // Backdrop click closes the lightbox. The target check is what the
     // old markup achieved with a stopPropagation() handler on .modal-box:

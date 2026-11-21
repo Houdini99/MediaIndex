@@ -2,75 +2,92 @@
 {% block title %}MediaIndex — Gallery{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">{% endblock %}
 {% block content %}
+{% from '_icons.html' import icon %}
 
 <div class="container">
   {% include '_flash.html' %}
-  <form class="toolbar" action="{{ url_for('media.index') }}" method="get" autocomplete="off">
-    <div class="search-group">
-      <div class="input-wrap">
+  {#- How many filters beyond the search box are set: the phone layout
+      folds them away and shows this count on the Filters button instead. -#}
+  {%- set active_filters = [exclude_tags, filter_type != 'all', sort != 'newest', hide_ai == '1', private_only]|select|list|length -%}
+  <form class="toolbar{{ ' has-filters' if active_filters }}" id="galleryToolbar" action="{{ url_for('media.index') }}" method="get" autocomplete="off">
+    {#- On a wide screen .toolbar-main and .toolbar-filters are
+        display:contents and everything sits in one wrapping row, as it
+        always has. On a phone the main row is search + Filters + Select,
+        and the rest opens below it. -#}
+    <div class="toolbar-main">
+      <div class="input-wrap search-wrap">
         <span class="input-icon">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
             <circle cx="6.5" cy="6.5" r="4.5"/><path d="M10.5 10.5l3 3"/>
           </svg>
         </span>
-        <input name="search" type="text" placeholder="Search tags…" value="{{ search|e }}" data-tag-ac>
+        <input name="search" type="search" enterkeyhint="search" placeholder="Search tags…" value="{{ search|e }}" data-tag-ac aria-label="Search tags">
       </div>
-      <div class="input-wrap">
+      <button class="btn btn-ghost toolbar-filter-btn" type="button" data-action="toggle-filters"
+              aria-expanded="false" aria-controls="galleryFilters" title="More filters">
+        {{- icon('sliders', 18) }}<span class="toolbar-btn-label">Filters</span>
+        {%- if active_filters %}<span class="filter-count" aria-label="{{ active_filters }} active">{{ active_filters }}</span>{% endif -%}
+      </button>
+      <button class="btn btn-ghost" type="button" id="select-toggle" data-action="select-mode" title="Select multiple files" aria-pressed="false">
+        {{- icon('check-square', 17) }}<span class="toolbar-btn-label" id="select-toggle-label">Select</span>
+      </button>
+    </div>
+    <div class="toolbar-filters" id="galleryFilters">
+      <div class="input-wrap exclude-wrap">
         <span class="input-icon">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d="M12 4L4 12M4 4l8 8"/>
           </svg>
         </span>
-        <input name="exclude_tags" type="text" placeholder="Exclude tags…" value="{{ exclude_tags|e }}" data-tag-ac>
+        <input name="exclude_tags" type="text" enterkeyhint="search" placeholder="Exclude tags…" value="{{ exclude_tags|e }}" data-tag-ac aria-label="Exclude tags">
       </div>
-    </div>
-    <select name="type">
-      <option value="all"   {% if filter_type=='all'   %}selected{% endif %}>All types</option>
-      <option value="image"  {% if filter_type=='image'  %}selected{% endif %}>Images</option>
-      <option value="video" {% if filter_type=='video' %}selected{% endif %}>Videos</option>
-      <option value="gif"   {% if filter_type=='gif'   %}selected{% endif %}>GIFs</option>
-    </select>
-    <select name="sort" data-autosubmit>
-      <option value="newest" {% if sort=='newest' %}selected{% endif %}>Newest first</option>
-      <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>Oldest first</option>
-      <option value="random" {% if sort=='random' %}selected{% endif %}>Random</option>
-    </select>
-    <label class="ai-toggle" title="Hide content with the following tags: fake, ai, grok, gemini, chatgpt">
-      <input type="checkbox" name="hide_ai" value="1" {% if hide_ai == '1' %}checked{% endif %} data-autosubmit>
-      <span class="ai-toggle-track"></span>
-      <span>Hide AI content</span>
-    </label>
-    <label class="ai-toggle private-toggle" title="Show only files you uploaded as private">
-      <input type="checkbox" name="private_only" value="1" {% if private_only %}checked{% endif %} data-autosubmit>
-      <span class="ai-toggle-track"></span>
-      <span>Private only</span>
-    </label>
-    <div class="toolbar-actions">
-      <button class="btn btn-primary" type="submit">Search</button>
-      <a class="btn btn-ghost" href="{{ url_for('media.index') }}">Reset</a>
-      <button class="btn btn-ghost" type="button" id="select-toggle" data-action="select-mode" title="Select multiple files">☑ Select</button>
+      <select name="type" aria-label="Media type">
+        <option value="all"   {% if filter_type=='all'   %}selected{% endif %}>All types</option>
+        <option value="image"  {% if filter_type=='image'  %}selected{% endif %}>Images</option>
+        <option value="video" {% if filter_type=='video' %}selected{% endif %}>Videos</option>
+        <option value="gif"   {% if filter_type=='gif'   %}selected{% endif %}>GIFs</option>
+      </select>
+      <select name="sort" data-autosubmit aria-label="Sort order">
+        <option value="newest" {% if sort=='newest' %}selected{% endif %}>Newest first</option>
+        <option value="oldest" {% if sort=='oldest' %}selected{% endif %}>Oldest first</option>
+        <option value="random" {% if sort=='random' %}selected{% endif %}>Random</option>
+      </select>
+      <label class="ai-toggle" title="Hide content with the following tags: fake, ai, grok, gemini, chatgpt">
+        <input type="checkbox" name="hide_ai" value="1" {% if hide_ai == '1' %}checked{% endif %} data-autosubmit>
+        <span class="ai-toggle-track"></span>
+        <span>Hide AI content</span>
+      </label>
+      <label class="ai-toggle private-toggle" title="Show only files you uploaded as private">
+        <input type="checkbox" name="private_only" value="1" {% if private_only %}checked{% endif %} data-autosubmit>
+        <span class="ai-toggle-track"></span>
+        <span>Private only</span>
+      </label>
+      <div class="toolbar-actions">
+        <button class="btn btn-primary" type="submit">Search</button>
+        <a class="btn btn-ghost" href="{{ url_for('media.index') }}">Reset</a>
+      </div>
     </div>
   </form>
 
   <!-- ── BULK ACTION BAR ── -->
-  <div id="bulk-bar" class="bulk-bar">
-    <span id="bulk-count" class="bulk-count">0 selected</span>
+  <div id="bulk-bar" class="bulk-bar" role="toolbar" aria-label="Selection actions">
+    <span id="bulk-count" class="bulk-count" aria-live="polite">0 selected</span>
     <div class="bulk-actions">
       <button class="btn btn-ghost" type="button" data-action="bulk-all">Select all</button>
-      <button class="btn btn-ghost" type="button" data-action="bulk-clear">Clear</button>
+      <button class="btn btn-ghost bulk-clear-btn" type="button" data-action="bulk-clear">Clear</button>
       <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-tags" data-mode="add" disabled>＋ Add tags</button>
       <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-tags" data-mode="remove" disabled>− Remove tags</button>
       <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-privacy" data-private="1" title="Encrypt the selection — only you can see private files" disabled>🔒 Make private</button>
       <button class="btn btn-ghost bulk-needs-sel" type="button" data-action="bulk-privacy" data-private="0" title="Decrypt the selection — public files are visible to every user" disabled>🔓 Make public</button>
-      <button class="btn bulk-delete-btn bulk-needs-sel" type="button" id="bulk-delete" data-action="bulk-delete" disabled>🗑 Delete selected</button>
-      <button class="btn btn-ghost" type="button" data-action="select-mode">Cancel</button>
+      <button class="btn bulk-delete-btn bulk-needs-sel" type="button" id="bulk-delete" data-action="bulk-delete" disabled>🗑 Delete</button>
+      <button class="btn btn-ghost bulk-cancel-btn" type="button" data-action="select-mode">Cancel</button>
     </div>
     <div id="bulk-tag-editor" class="bulk-tag-editor">
       <div class="bulk-tag-wrap">
-        <input id="bulk-tag-input" type="text" placeholder="Tags, comma separated…" data-tag-ac>
+        <input id="bulk-tag-input" type="text" enterkeyhint="done" placeholder="Tags, comma separated…" data-tag-ac>
       </div>
       <button class="btn btn-primary" type="button" id="bulk-tag-apply" data-action="bulk-tag-apply">Apply</button>
-      <button class="btn btn-ghost" type="button" data-action="bulk-tag-close">✕</button>
+      <button class="btn btn-ghost" type="button" data-action="bulk-tag-close" aria-label="Close the tag editor">✕</button>
     </div>
   </div>
 
@@ -128,24 +145,44 @@
 </div>
 
 <!-- ── MODAL ── -->
-<div id="modal-bg" class="modal-bg">
+<div id="modal-bg" class="modal-bg" role="dialog" aria-modal="true" aria-label="Preview">
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title">Preview</span>
       <div class="modal-header-actions">
-        <button id="modal-slideshow" class="modal-btn" data-action="slideshow" title="Slideshow — advances every 5 s (videos play to the end)">▶ Slideshow</button>
-        <a id="modal-download" href="#" download class="modal-btn">↓ Download</a>
-        <button class="modal-btn modal-delete-btn" data-action="modal-delete" title="Delete file" style="color:var(--danger);border-color:rgba(248,81,73,.25);">🗑 Delete</button>
-        <button class="modal-close" data-action="modal-close" title="Close">×</button>
+        <button id="modal-slideshow" class="modal-btn" data-action="slideshow" title="Slideshow — advances every 5 s (videos play to the end)" aria-label="Start slideshow" aria-pressed="false">
+          <span data-ss-play>{{ icon('play', 16) }}</span><span data-ss-pause hidden>{{ icon('pause', 16) }}</span><span class="modal-btn-label" id="modal-slideshow-label">Slideshow</span>
+        </button>
+        <a id="modal-download" href="#" download class="modal-btn" title="Download" aria-label="Download">
+          {{- icon('download', 16) }}<span class="modal-btn-label" id="modal-download-name"></span>
+        </a>
+        <button class="modal-btn modal-delete-btn" data-action="modal-delete" title="Delete file" aria-label="Delete file">
+          {{- icon('trash', 16) }}<span class="modal-btn-label">Delete</span>
+        </button>
+        <button class="modal-close" data-action="modal-close" title="Close (Esc)" aria-label="Close">{{ icon('close', 18) }}</button>
       </div>
     </div>
     <div class="modal-body">
-      <button class="modal-nav modal-nav-prev" data-action="modal-prev" title="Previous (←)">‹</button>
+      <button class="modal-nav modal-nav-prev" data-action="modal-prev" title="Previous (←)" aria-label="Previous">{{ icon('chevron-left', 22) }}</button>
       <div class="modal-view-content"></div>
-      <button class="modal-nav modal-nav-next" data-action="modal-next" title="Next (→)">›</button>
+      <button class="modal-nav modal-nav-next" data-action="modal-next" title="Next (→)" aria-label="Next">{{ icon('chevron-right', 22) }}</button>
     </div>
     <div class="modal-footer">
-      <div class="modal-tags"></div>
+      <div class="modal-tags-row">
+        <div class="modal-tags"></div>
+        <button class="modal-btn modal-edit-btn" type="button" data-action="modal-edit" title="Edit tags">
+          {{- icon('edit', 14) }}<span>Edit tags</span>
+        </button>
+      </div>
+      <div class="modal-edit" id="modal-edit" hidden>
+        <div class="modal-edit-wrap">
+          <input id="modal-edit-input" type="text" enterkeyhint="done" placeholder="Tags separated by commas…" data-tag-ac aria-label="Tags">
+        </div>
+        <div class="modal-edit-btns">
+          <button class="btn btn-ghost btn-sm" type="button" data-action="modal-edit-cancel">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="button" id="modal-edit-save" data-action="modal-edit-save">Save</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

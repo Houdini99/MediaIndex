@@ -128,7 +128,17 @@
         .queue-layout { grid-template-columns: 1fr; }
         .queue-side { position: static; }
     }
-    @media (max-width: 560px) {
-        .queue-item { flex-direction: column; }
-        .queue-thumb { width: 100%; height: 140px; }
+    @media (max-width: 760px) {
+        /* A row per file, as on a desktop, with a square thumbnail: the
+           full-width 140px picture made each waiting file a screen tall. */
+        #queueList { gap: .6rem; }
+        .queue-item { padding: .7rem; gap: .7rem; }
+        .queue-thumb { width: 64px; height: 64px; border-radius: 8px; }
+        .queue-item-head { flex-wrap: wrap; gap: .1rem .5rem; }
+        .queue-filename { flex-basis: 100%; }
+        .queue-details input[type="text"] { height: 42px; }
+        .queue-actions .btn { flex: 1; }
+        .dav-actions { flex-wrap: wrap; }
+        .dav-actions .btn { flex: 1; }
+        .queue-empty { padding: 2.5em 1em; }
     }

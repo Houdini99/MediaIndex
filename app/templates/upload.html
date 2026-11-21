@@ -5,6 +5,9 @@
 {% block content %}
 <div class="container">
   {% include '_flash.html' %}
+  {#- upload.js posts with XHR for the progress bar and writes the result
+      here, in the same form as the flash messages above. -#}
+  <div class="flashes" id="uploadMessages" role="status" aria-live="polite" hidden></div>
   {{ page_header('Upload', 'Upload images, GIFs, and videos') }}
 
   <div class="side-layout upload-layout">
@@ -14,15 +17,28 @@
         <input id="filesInput" type="file" name="files" multiple
                accept="image/*,video/*,.webp,.heic,.gif">
 
-        <div class="drop-zone" id="dropZone">
+        <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Choose files to upload">
           <span class="drop-zone-icon">&#8659;</span>
-          <h3>Drag files here</h3>
-          <p>or <em>Select files</em></p>
+          {#- Nothing is dragged on a phone: the touch copy says what a tap does. #}
+          <h3 class="dz-pointer">Drag files here</h3>
+          <p class="dz-pointer">or <em>Select files</em></p>
+          <h3 class="dz-touch">Choose photos and videos</h3>
+          <p class="dz-touch">Tap to pick from your library or take one now</p>
         </div>
 
+        <div class="upload-summary" id="uploadSummary" hidden></div>
         <div id="previews"></div>
 
-        <button class="upload-btn" type="submit">Start upload</button>
+        <div class="upload-footer">
+          <div class="upload-progress" id="uploadProgress" hidden>
+            <div class="upload-progress-bar"><div class="upload-progress-fill" id="uploadProgressFill"></div></div>
+            <div class="upload-progress-meta">
+              <span id="uploadProgressText">Uploading…</span>
+              <span id="uploadProgressPct"></span>
+            </div>
+          </div>
+          <button class="upload-btn" id="uploadBtn" type="submit">Start upload</button>
+        </div>
       </form>
     </div>
 

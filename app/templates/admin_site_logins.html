@@ -33,12 +33,12 @@
         {% for row in rows %}
         {% set plat = row.platform %}
         <tr>
-          <td>
+          <td class="cell-title">
             <strong>{{ plat.name }}</strong>
             {% if plat.domains %}<div class="admin-note login-domains mono">{{ plat.domains|join(', ') }}</div>{% endif %}
             <div class="admin-note login-hint">{{ plat.hint }}</div>
           </td>
-          <td>
+          <td data-label="Status" class="cell-stack">
             {% if not row.login %}
               <span class="role-badge">not set</span>
             {% elif not row.login.readable %}
@@ -58,8 +58,8 @@
               <div class="admin-note login-hint">{{ row.info.count }} cookie(s)</div>
             {% endif %}
           </td>
-          <td>{% if row.login %}{{ row.uploaded_at }}{% if row.login.uploaded_by %}<div class="admin-note login-hint">by {{ row.login.uploaded_by }}</div>{% endif %}{% else %}—{% endif %}</td>
-          <td>{{ row.rotated_at or '—' }}</td>
+          <td data-label="Uploaded">{% if row.login %}{{ row.uploaded_at }}{% if row.login.uploaded_by %}<div class="admin-note login-hint">by {{ row.login.uploaded_by }}</div>{% endif %}{% else %}—{% endif %}</td>
+          <td data-label="Kept fresh">{{ row.rotated_at or '—' }}</td>
           <td class="col-actions">
             <div class="login-actions">
             <form method="post" action="{{ url_for('admin.site_login_upload', platform_id=plat.id) }}"

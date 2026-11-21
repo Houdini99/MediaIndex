@@ -195,6 +195,7 @@
     .size-note { font-size: .75rem; color: var(--muted); font-weight: 400; margin-left: .4rem; }
     .warn-badge { color: var(--warning); font-size: .8rem; }
     .admin-note { font-size: .78rem; color: var(--muted); margin: 0 0 .75rem; }
+    .admin-note-inline { margin: 0; }
 
     /* Log viewer */
     .log-toolbar { margin-bottom: 1rem; }
@@ -458,6 +459,16 @@
     .admin-note.login-domains { margin: .25rem 0 0; max-width: 34rem; }
     .admin-note.login-footnote { margin: .75rem 0 0; }
     .login-file { font-size: .75rem; color: var(--muted); max-width: 13rem; }
+    .login-file::file-selector-button {
+        margin-right: .6rem;
+        padding: .3rem .7rem;
+        border: 1px solid var(--border2);
+        border-radius: 7px;
+        background: var(--surf2);
+        color: var(--text2);
+        font: inherit;
+        cursor: pointer;
+    }
     /* Upload over Remove: side by side they ran past the table's edge. */
     .login-actions {
         display: flex;
@@ -470,15 +481,139 @@
     @media (max-width: 960px) {
         .admin-stats-row { grid-template-columns: repeat(3, 1fr); }
     }
-    @media (max-width: 720px) {
-        .admin-section { padding: 1rem; }
+    /* Tablet widths keep the tables, but the Users actions (password,
+       promote, delete-with-reassign) no longer fit one line: let them wrap
+       inside the cell instead of pushing the page wider than the screen. */
+    @media (max-width: 1100px) {
         .col-actions { white-space: normal; }
-        .inline-form { margin-top: .25rem; }
-        .admin-table { display: block; overflow-x: auto; }
-        .admin-stats-row { grid-template-columns: repeat(2, 1fr); }
-        /* Five tabs don't fit a phone in one row; wrap, don't spill. */
-        .admin-tabs { width: 100%; flex-wrap: wrap; }
+        .col-actions .inline-form { justify-content: flex-end; margin: .15rem 0; }
+        .col-actions select { max-width: 100%; }
+    }
+    @media (max-width: 760px) {
+        /* Tabs: one row that scrolls sideways (common.js centres the
+           active one) instead of two wrapped rows. */
+        .admin-tabs {
+            width: 100%;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        .admin-tabs::-webkit-scrollbar { display: none; }
+        .admin-tabs a { flex: 0 0 auto; padding: .5rem .85rem; }
+
+        .admin-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+        .stat-card { padding: .75rem .85rem; }
+        .stat-num { font-size: 1.3rem; white-space: normal; }
+        .stat-label { font-size: .68rem; line-height: 1.35; }
+
+        .admin-section { padding: 1rem .9rem; margin-bottom: 1rem; border-radius: 12px; }
+        .admin-section-title { font-size: .95rem; }
+        .admin-subsection-title { font-size: .72rem; }
+
+        /* Tables become a card per row: the cell that names the row on
+           top, every other cell as "LABEL ... value" from its data-label,
+           the actions full width underneath. Side-scrolling a table with a
+           column of forms in it was the only way to reach them before. */
+        .admin-table,
+        .admin-table tbody { display: block; width: 100%; }
+        .admin-table thead { display: none; }
+        .admin-table tr {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            column-gap: .6rem;
+            padding: .75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .admin-table tbody tr:last-child { border-bottom: none; }
+        .admin-table td {
+            display: flow-root;
+            flex: 1 1 100%;
+            min-width: 0;
+            padding: .2rem 0;
+            border: none;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+        .admin-table tbody tr:hover td { background: none; }
+        .admin-table td[data-label]::before {
+            content: attr(data-label);
+            float: left;
+            margin-right: 1rem;
+            color: var(--muted);
+            font-family: inherit;
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            line-height: 1.9;
+        }
+        /* Long values (file names, tags, timestamps) go under their label. */
+        .admin-table td.mono,
+        .admin-table td.cell-stack { text-align: left; }
+        .admin-table td.mono[data-label]::before,
+        .admin-table td.cell-stack[data-label]::before { float: none; display: block; margin: 0; line-height: 1.6; }
+        .admin-table td.cell-title {
+            order: -1;
+            text-align: left;
+            font-size: .92rem;
+            font-weight: 600;
+            color: var(--text);
+            padding-bottom: .3rem;
+        }
+        .admin-table td.cell-title .admin-note { font-weight: 400; }
+        /* A checkbox and a thumbnail share the title's line. */
+        .admin-table td.cell-check,
+        .admin-table td.cell-thumb { flex: 0 0 auto; order: -2; padding: 0; }
+        .admin-table td.cell-title.cell-inline { flex: 1 1 0; padding: 0; }
+        .admin-table td.cell-check input { width: 20px; height: 20px; accent-color: var(--accent); }
+        .col-actions { white-space: normal; }
+        .admin-table td.col-actions { text-align: left; padding-top: .5rem; }
+        .admin-table .col-actions .inline-form {
+            display: flex;
+            width: 100%;
+            margin-top: .45rem;
+        }
+        .admin-table .col-actions .inline-form input[type="password"],
+        .admin-table .col-actions .inline-form select { flex: 1 1 150px; width: auto; min-width: 0; }
+        .admin-table .col-actions .inline-form .btn { flex: 1 0 auto; }
+        .admin-table select {
+            background: var(--surf2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            padding: .42rem .65rem;
+            height: 40px;
+        }
+        .tag-result-scroll { max-height: 70vh; border: none; border-radius: 0; }
+
+        /* Forms: fields full width, buttons on the row beneath. */
+        .admin-form input[type="text"],
+        .admin-form input[type="password"],
+        .inline-form input[type="password"] { flex: 1 1 100%; width: 100%; height: 42px; }
+        .admin-form .btn { flex: 1 1 auto; }
+        .btn-sm { min-height: 42px; }
+        .dry-run-label { white-space: normal; min-height: 36px; }
+        .log-toolbar select { flex: 1 1 40%; min-width: 0; height: 42px; }
+        .log-toolbar input[type="text"] { min-width: 0; }
+        .log-view { max-height: 70vh; font-size: .7rem; padding: .7rem; }
+
+        /* Near duplicates */
         .dupe-scan-form,
-        .dupe-match-form { flex-direction: column; align-items: stretch; }
+        .dupe-match-form { flex-direction: column; align-items: stretch; gap: .85rem; }
+        .dupe-field-wide { min-width: 0; }
+        .dupe-field select,
+        .dupe-field input[type="number"] { width: 100%; height: 42px; }
+        .dupe-scan-actions .btn,
+        .dupe-head-actions .btn { flex: 1 1 auto; }
+        .dupe-head-actions { width: 100%; }
         .dupe-items { grid-template-columns: 1fr; }
+        .dupe-group { padding: .75rem; }
+        .dupe-group-actions .btn { flex: 1 1 auto; }
+
+        /* Site logins */
+        .login-actions { align-items: stretch; }
+        .login-actions .inline-form { flex-wrap: wrap; }
+        .login-file { max-width: 100%; flex: 1 1 100%; }
     }

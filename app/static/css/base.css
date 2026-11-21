@@ -25,11 +25,52 @@
         --danger:       #f85149;
         --warning:      #d29922;
         --r:            12px;
+        /* The phone tab bar's height (common.css). Zero where there is no
+           tab bar — wide screens and the sign-in pages — so anything that
+           has to clear it can always subtract it. */
+        --tabbar-h:     0px;
+        /* Room to leave for the phone's own bars and corners. Zero in a
+           browser tab, where the browser keeps the page clear of them
+           itself (_head_meta.html says why viewport-fit=cover is not set);
+           only the app opened from the home screen uses the insets. */
+        --safe-top:     0px;
+        --safe-right:   0px;
+        --safe-bottom:  0px;
+        --safe-left:    0px;
+    }
+    @media (display-mode: standalone), (display-mode: fullscreen) {
+        :root {
+            --safe-top:    env(safe-area-inset-top, 0px);
+            --safe-right:  env(safe-area-inset-right, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-left:   env(safe-area-inset-left, 0px);
+        }
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html { color-scheme: dark; }
+    html {
+        color-scheme: dark;
+        /* No font inflation when a phone turns to landscape. */
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        /* The grey flash on every tap; controls draw their own :active. */
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* `hidden` means hidden. Without this any element whose class sets a
+       display (.btn is inline-flex) stays visible with the attribute on —
+       the Revoke, Cancel-scan and pager buttons all did. */
+    [hidden] { display: none !important; }
+
+    /* iOS zooms the whole page into any focused field set below 16px and
+       leaves it zoomed. Every form control in the app is smaller than that
+       on a desktop, so on a phone they all come up to 16px. */
+    @media (max-width: 760px) {
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+        select,
+        textarea { font-size: 16px !important; }
+    }
 
     /* ── FLASH MESSAGES ─────────────────────────────────────────────────── */
     .flashes { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: .4rem; }

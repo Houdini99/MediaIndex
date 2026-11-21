@@ -73,8 +73,11 @@
     .tag-item:hover {
         border-color: rgba(124,106,255,.35);
         background: rgba(124,106,255,.03);
-        transform: translateX(3px);
     }
+    @media (hover: hover) {
+        .tag-item:hover { transform: translateX(3px); }
+    }
+    .tag-item:active { background: rgba(124,106,255,.07); }
 
     .tag-dot {
         width: 8px; height: 8px;
@@ -139,14 +142,30 @@
     .no-tags-msg p { margin-top: .5em; font-size: .875rem; }
     .no-tags-msg p:first-of-type { font-size: 1rem; font-weight: 500; color: var(--text2); }
 
-    @media (max-width: 680px) {
-        .container { padding: 1rem; }
-        .stats-row { grid-template-columns: repeat(3, 1fr); gap: .5rem; }
-        .stat-num { font-size: 1.5rem; }
-        .tag-name { max-width: 160px; }
-    }
-    @media (max-width: 420px) {
-        .stats-row { grid-template-columns: 1fr; }
+    @media (max-width: 760px) {
+        /* Three small tiles in one row rather than three screen-wide
+           cards stacked over the list. */
+        .stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; margin-bottom: 1rem; }
+        .stat-card { padding: .7rem .75rem; border-radius: 10px; }
+        .stat-num { font-size: 1.25rem; }
+        .stat-label { font-size: .68rem; line-height: 1.3; }
+        /* The filter stays under the thumb while the list scrolls. */
+        .tag-toolbar {
+            position: sticky;
+            top: var(--nav-h);
+            z-index: 10;
+            max-width: none;
+            margin: 0 -.85rem .75rem;
+            padding: .55rem .85rem;
+            background: rgba(2,4,8,.94);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        #tagSearch { height: 44px; }
+        .tag-list { gap: .3rem; }
+        .tag-item { min-height: 48px; padding: .5rem .75rem; gap: .6rem; }
+        .tag-name { flex: 1 1 auto; max-width: none; }
+        .tag-bar-track { flex: 0 1 25%; min-width: 24px; }
     }
 
     /* ── Admin inline tag actions ────────────────────────────────────── */
@@ -184,4 +203,8 @@
     }
     @media (hover: none) {
         .tag-admin-actions { opacity: 1; }  /* always visible on touch */
+    }
+    @media (pointer: coarse) {
+        .tag-admin-actions { gap: .35rem; margin-left: .2rem; }
+        .tag-act { width: 34px; height: 34px; font-size: .8rem; border-radius: 8px; }
     }

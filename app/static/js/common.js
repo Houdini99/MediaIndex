@@ -74,6 +74,33 @@ MI.postJSON = function (url, data) {
     });
 };
 
+/* POST with upload progress, for the upload page. fetch() reports none,
+ * so this is XHR — with MI.post's headers. onProgress(loaded, total) runs
+ * as bytes go out (total is 0 when the browser cannot tell) and once more
+ * as onProgress(null) when the last byte is sent and the server is
+ * working. Resolves with the XHR once it loads, whatever its status;
+ * rejects when the network fails or the request is aborted.
+ */
+MI.postWithProgress = function (url, body, onProgress) {
+    return new Promise(function (resolve, reject) {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.setRequestHeader('X-CSRFToken', MI.csrf());
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.responseType = 'json';
+        if (onProgress) {
+            xhr.upload.addEventListener('progress', function (ev) {
+                onProgress(ev.loaded, ev.lengthComputable ? ev.total : 0);
+            });
+            xhr.upload.addEventListener('load', function () { onProgress(null); });
+        }
+        xhr.addEventListener('load', function () { resolve(xhr); });
+        xhr.addEventListener('error', function () { reject(new Error('network')); });
+        xhr.addEventListener('abort', function () { reject(new Error('aborted')); });
+        xhr.send(body);
+    });
+};
+
 /* ── Tag pills ──────────────────────────────────────────────────────────
  * Built in three places (the gallery card, the gallery lightbox footer,
  * and the feed slide) from three copies of the same loop. They differed in
@@ -231,4 +258,52 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-scroll-bottom]').forEach(function (el) {
         el.scrollTop = el.scrollHeight;
     });
+});
+
+/* ── Account menu ───────────────────────────────────────────────────────
+ * Below 1024px the Settings / Admin / Sign Out links fold into a menu
+ * behind the user chip (common.css). Above that they are inline and the
+ * chip opens nothing, so the toggle stands down there rather than flip an
+ * aria-expanded that describes no menu. A tap anywhere else, or Escape,
+ * closes it.
+ */
+(function () {
+    const narrow = window.matchMedia('(max-width: 1023px)');
+
+    function setOpen(right, open) {
+        right.classList.toggle('is-open', open);
+        const chip = right.querySelector('.user-chip');
+        if (chip) chip.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function closeAll() {
+        document.querySelectorAll('.nav-right.is-open').forEach(r => setOpen(r, false));
+    }
+
+    MI.on('account-menu', function (el) {
+        if (!narrow.matches) return;
+        const right = el.closest('.nav-right');
+        if (right) setOpen(right, !right.classList.contains('is-open'));
+    });
+    document.addEventListener('click', function (ev) {
+        const open = document.querySelector('.nav-right.is-open');
+        if (open && !open.contains(ev.target)) setOpen(open, false);
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') closeAll();
+    });
+    // Widening the window past the breakpoint turns the menu back into
+    // inline links; a stale open state would reappear on the way back.
+    narrow.addEventListener('change', closeAll);
+})();
+
+/* ── Admin tabs ─────────────────────────────────────────────────────────
+ * On a phone the tabs are one row that scrolls sideways (admin.css); start
+ * it scrolled so the current page's tab is in view, not cut off the edge.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    const tabs = document.querySelector('.admin-tabs');
+    const active = tabs && tabs.querySelector('a.active');
+    if (!active || tabs.scrollWidth <= tabs.clientWidth) return;
+    const offset = active.getBoundingClientRect().left - tabs.getBoundingClientRect().left;
+    tabs.scrollLeft += offset - (tabs.clientWidth - active.offsetWidth) / 2;
 });

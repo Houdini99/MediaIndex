@@ -164,9 +164,20 @@ def upload():
             is_private = form_flag(request.form.get(f'private_{i}'))
             status, _ = _store_upload(f, tags, uid, is_private)
             results[status].append(f.filename or '(unnamed)')
-        for status, prefix, category in _UPLOAD_FLASHES:
-            if results[status]:
-                flash(f"{prefix}: {', '.join(results[status])}", category)
+        messages = [
+            (category, f"{prefix}: {', '.join(results[status])}")
+            for status, prefix, category in _UPLOAD_FLASHES if results[status]
+        ]
+        # The upload page posts with XHR so it can show a progress bar, and
+        # renders these itself: flashed, they would be eaten by the redirect
+        # the XHR follows and never reach the page.
+        if _wants_json():
+            return jsonify({
+                'messages': [{'category': c, 'text': t} for c, t in messages],
+                'counts': {status: len(names) for status, names in results.items()},
+            })
+        for category, text in messages:
+            flash(text, category)
         return redirect(url_for('media.upload'))
     return render_template('upload.html')
 
@@ -394,7 +405,14 @@ def edit_bulk():
 @login_required
 def edit_tags(media_id):
     new_tags = request.form.get('tags', '').strip()
-    if update_media_tags(media_id, new_tags, g.user['id'], is_admin=g.user['is_admin']):
+    ok = update_media_tags(media_id, new_tags, g.user['id'], is_admin=g.user['is_admin'])
+    if _wants_json():
+        # The gallery edits in place, so it needs the tags as stored —
+        # trimmed, empty entries dropped — to redraw the card, not a
+        # redirect.
+        m = get_media_by_id(media_id, viewer_id=g.user['id']) if ok else None
+        return jsonify({'updated': ok, 'tags': m['tags'] if m else None}), (200 if ok else 403)
+    if ok:
         flash("✅ Tags successfully updated.", "success")
     else:
         flash("❌ Error updating tags.", "danger")
@@ -422,6 +440,9 @@ def media_meta(media_id):
             # API always served (jsonify would render RFC-822 instead).
             'upload_date': m['upload_date'].isoformat() if m['upload_date'] else None,
             'is_private': bool(m['is_private']),
+            # Edit and delete are the owner's or an admin's; the lightbox
+            # offers them only to those, as the feed does with can_delete.
+            'can_edit': bool(g.user['is_admin']) or m['uploaded_by'] == g.user['id'],
         })
     return jsonify({'error': 'Not found'}), 404
 

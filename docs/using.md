@@ -5,10 +5,12 @@ time you log in, and after an admin resets your password, you replace the
 password the admin gave you with one of your own. The navigation bar has
 **Gallery**, **Feed**, **Upload**, **Untagged** (the [WebDAV
 inbox](webdav.md)) and **Tags**, plus the cogwheel for your **Settings**.
-Admins also see **Admin** ([Admin panel](admin.md)).
+Admins also see **Admin** ([Admin panel](admin.md)). In a narrower
+window, Settings, Admin and Sign Out are in a menu behind your name.
 
 **Contents**
 
+- [On a phone](#on-a-phone)
 - [Gallery](#gallery)
 - [Feed](#feed)
 - [Tags](#tags)
@@ -16,6 +18,21 @@ Admins also see **Admin** ([Admin panel](admin.md)).
 - [Private media](#private-media)
 - [Who can change what](#who-can-change-what)
 - [Settings: password, Telegram and Discord](#settings-password-telegram-and-discord)
+
+## On a phone
+
+On a phone the pages are a tab bar along the bottom of the screen, and
+your avatar in the top right opens Settings, Admin and Sign Out. The rest
+of this page works the same way, with these differences:
+
+- The gallery's filters fold away under **Filters** next to the search
+  box; a number on the button says how many are set.
+- Edit tags and delete from the full-size view; the cards don't carry the
+  buttons. Swipe sideways in the full-size view for the next or previous
+  item, and swipe down (or use Back) to close it.
+- Volume is your phone's own buttons; the feed has mute only.
+- Your browser's **Add to Home Screen** installs MediaIndex with its own
+  icon. Opened from there, it fills the screen like an app.
 
 ## Gallery
 
@@ -40,8 +57,11 @@ the last comma.
 
 **Each card** shows the type, and a *private* badge on your private items.
 You can edit its tags in place or delete it. Click it to open the full-size
-view, which plays videos, downloads the file under its original name, and
-closes with `Escape`.
+view, which plays videos, downloads the file under its original name, runs
+a slideshow, and lets you edit the tags or delete the item if it is yours.
+`←` and `→` move to the neighbouring items, and `Escape` or the browser's
+Back closes it. Edits and deletions show at once, without reloading the
+page.
 
 **Select mode** works on many items at once. Turn on **Select** in the
 toolbar, click cards (or **Select all**), then use the action bar to
@@ -64,7 +84,8 @@ going.
 - **Slideshow** advances by itself: images and GIFs after a set time (1 to
   120 seconds, 5 by default), videos when they finish.
 - **Fullscreen** hides everything but the media. It isn't remembered when
-  you reload.
+  you reload. On a phone it also hides the browser's own bars where the
+  browser allows that, and its button stays in the corner as the way out.
 
 | Key | Action |
 |---|---|
@@ -97,6 +118,8 @@ tags (with suggestions) and its own **private** checkbox.
   to 10 GiB per upload. AVI, MOV and MKV may not play in every browser.
 - Files are identified by their content. Uploading a file that is already
   in the index is reported as a duplicate and skipped.
+- A progress bar shows how much has been sent, then *Processing…* while
+  the server stores the files. Leaving the page mid-upload asks first.
 - After the upload, a summary lists what was added, what was a duplicate
   and what failed.
 - Video thumbnails are made in the background, so a new video shows a
