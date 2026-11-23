@@ -21,7 +21,8 @@ from bots_common import sniff
 from discord_bot import bot as botmod
 from discord_bot import download
 
-ALLOWED = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov', 'mkv'}
+ALLOWED = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'm4v', 'webm', 'mov',
+           'mkv'}
 BARE_FILE = 'https://files.example/ab/cd/abcdef0123456789abcdef0123456789'
 
 
@@ -47,6 +48,18 @@ def test_without_a_filename_the_type_names_the_extension():
         'Content-Type': 'image/jpeg; charset=binary'}, ALLOWED) == 'media.jpg'
     assert sniff.media_name('https://cdn.example/clip', {
         'Content-Type': 'video/quicktime'}, ALLOWED) == 'clip.mov'
+
+
+def test_apaches_m4v_type_names_m4v_and_mp4_stays_mp4():
+    """Apache serves .m4v as video/x-m4v, which no mimetypes table maps
+    back to an extension. Debian's table also files .m4v under video/mp4,
+    and a video/mp4 must still name an .mp4."""
+    assert sniff.media_name('https://cdn.example/clip', {
+        'Content-Type': 'video/x-m4v'}, ALLOWED) == 'clip.m4v'
+    assert sniff.media_name('https://cdn.example/clip', {
+        'Content-Type': 'video/mp4'}, ALLOWED) == 'clip.mp4'
+    assert sniff.media_name('https://cdn.example/clip', {
+        'Content-Type': 'video/x-m4v'}, ALLOWED - {'m4v'}) is None
 
 
 @pytest.mark.parametrize('headers', [

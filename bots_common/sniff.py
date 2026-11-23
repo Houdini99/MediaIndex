@@ -29,6 +29,12 @@ import aiohttp
 
 from .parsing import file_ext
 
+# Content-Types mimetypes knows no extension for. Apache's stock table
+# serves .m4v as video/x-m4v; Python's built-in table has no .m4v at all,
+# and Debian's /etc/mime.types (absent from the slim bot image anyway)
+# files it under video/mp4.
+_EXTRA_TYPE_EXT = {'video/x-m4v': 'm4v'}
+
 #: Redirect hops followed before giving up. Each one is re-checked, since
 #: a public URL that 302s to 127.0.0.1 is the obvious way around a check
 #: that only looked at what the user typed.
@@ -120,8 +126,8 @@ def media_name(url, headers, allowed_ext):
     if not is_media:
         return None
     ext = next((e[1:] for e in mimetypes.guess_all_extensions(ctype)
-                if e[1:] in allowed_ext), None)
-    if not ext:
+                if e[1:] in allowed_ext), None) or _EXTRA_TYPE_EXT.get(ctype)
+    if ext not in allowed_ext:
         return None
     stem = posixpath.basename(urllib.parse.urlsplit(url).path) or 'media'
     return f'{stem}.{ext}'

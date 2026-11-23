@@ -6,6 +6,19 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Upgrading from 1.3.0
+
+- Rebuild the web app and both bot images with `./build.sh`. The database
+  is untouched.
+
+### Added
+
+- `.m4v` videos. Uploads, the WebDAV inbox and both bots accept them, and
+  they play inline like MP4. The web app serves them as `video/mp4`: its
+  image has no system MIME table, and Python's own has no `.m4v`, so
+  they would otherwise go out as `application/octet-stream`. A link that
+  names no file and answers `video/x-m4v` is ingested as `.m4v`.
+
 ## [1.3.0] — 2026-11-21
 
 The web app works properly on a phone now. Page links sit in a tab bar

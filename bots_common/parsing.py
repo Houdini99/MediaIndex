@@ -20,7 +20,7 @@ _URL_RE = re.compile(r'https?://[^\s<>]+')
 # which the bots cannot import, so an unsupported file is skipped here
 # instead of after a wasted download and upload.
 IMAGE_EXT = frozenset({'jpg', 'jpeg', 'png', 'webp', 'gif'})
-ALLOWED_EXT = IMAGE_EXT | {'mp4', 'webm', 'avi', 'mov', 'mkv'}
+ALLOWED_EXT = IMAGE_EXT | {'mp4', 'm4v', 'webm', 'avi', 'mov', 'mkv'}
 
 
 def split_tags(raw):

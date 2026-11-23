@@ -210,7 +210,7 @@ Changing one means editing the file and rebuilding the image.
 |---|---|
 | Image types | `jpg`, `jpeg`, `png`, `webp` |
 | GIF | `gif` |
-| Video types | `mp4`, `webm`, `avi`, `mov`, `mkv` (AVI, MOV and MKV may not play in every browser) |
+| Video types | `mp4`, `m4v`, `webm`, `avi`, `mov`, `mkv` (AVI, MOV and MKV may not play in every browser) |
 | Largest upload | 10 GiB per request |
 | Thumbnail size | 150 × 150 |
 | Gallery page size | 30 items |

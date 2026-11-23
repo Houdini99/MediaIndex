@@ -32,10 +32,11 @@ class Config:
     # File-type allow-lists. HEIC was dropped: Pillow can't decode it without
     # pillow-heif, so uploads produced placeholder thumbs and browsers can't
     # display it inline anyway. AVI/MOV/MKV are accepted but may not play
-    # inline in every browser.
+    # inline in every browser. M4V is Apple's name for an MP4 and is served
+    # as one (EXTRA_MIME_TYPES in app/media/processing.py).
     ALLOWED_IMAGE_EXT = {'jpg', 'jpeg', 'png', 'webp'}
     ALLOWED_GIF_EXT = {'gif'}
-    ALLOWED_VIDEO_EXT = {'mp4', 'webm', 'avi', 'mov', 'mkv'}
+    ALLOWED_VIDEO_EXT = {'mp4', 'm4v', 'webm', 'avi', 'mov', 'mkv'}
 
     # Behaviour
     THUMB_SIZE = (150, 150)

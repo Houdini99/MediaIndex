@@ -138,7 +138,7 @@ def extract_item(message):
             # arrives.
             mime = (getattr(payload, 'mime_type', '') or '').lower()
             ext = mime.rsplit('/', 1)[-1] if '/' in mime else ''
-            ext = {'quicktime': 'mov', 'x-matroska': 'mkv',
+            ext = {'quicktime': 'mov', 'x-matroska': 'mkv', 'x-m4v': 'm4v',
                    'jpeg': 'jpg'}.get(ext, ext)
             name = f"telegram_{message.message_id}.{ext or 'bin'}"
         return _Item(payload.file_id, name, ext, payload.file_size or 0,

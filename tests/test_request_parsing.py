@@ -18,7 +18,8 @@ def test_form_flag_off(value):
 
 @pytest.mark.parametrize('ext, ftype', [
     ('png', 'image'), ('JPG', 'image'), ('gif', 'gif'), ('mp4', 'video'),
-    ('WebM', 'video'), ('exe', 'unknown'), ('', 'unknown'),
+    ('WebM', 'video'), ('m4v', 'video'), ('M4V', 'video'),
+    ('exe', 'unknown'), ('', 'unknown'),
 ])
 def test_the_extension_helpers_agree_with_the_name_based_ones(ext, ftype):
     assert ext_type(ext) == ftype == file_type(f'clip.{ext}')

@@ -293,11 +293,14 @@ def test_document_keeps_its_filename():
     assert item.filename == 'cat.webm' and item.ext == 'webm'
 
 
-def test_extension_falls_back_to_the_mime_type():
+@pytest.mark.parametrize('mime, ext', [
+    ('video/quicktime', 'mov'), ('video/x-m4v', 'm4v'),
+])
+def test_extension_falls_back_to_the_mime_type(mime, ext):
     """A camera video often arrives with no usable filename."""
     item = extract_item(FakeMessage(
-        document=FakeDocument(name=None, mime='video/quicktime')))
-    assert item.ext == 'mov'
+        document=FakeDocument(name=None, mime=mime)))
+    assert item.ext == ext and item.filename.endswith(f'.{ext}')
 
 
 def test_a_message_with_no_media_yields_nothing():

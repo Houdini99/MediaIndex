@@ -5,6 +5,7 @@ Pure I/O helpers — no Flask, no SQL.
 import hashlib
 import io
 import logging
+import mimetypes
 import os
 import re
 
@@ -36,6 +37,24 @@ def file_type(filename):
 
 def allowed_file(filename):
     return allowed_ext(filename.rsplit('.', 1)[-1])
+
+
+#: Content-Types for accepted extensions that Python's built-in table
+#: lacks. The web image (python:*-slim) has no /etc/mime.types to fill the
+#: gap, so without these an .m4v goes out as application/octet-stream
+#: instead of a video.
+EXTRA_MIME_TYPES = {'.m4v': 'video/mp4'}
+
+
+def register_mime_types():
+    """Add EXTRA_MIME_TYPES to the mimetypes table every media response
+    takes its Content-Type from: send_from_directory, the decrypting
+    stream and the WebDAV staging preview. Runs once on import."""
+    for ext, mime in EXTRA_MIME_TYPES.items():
+        mimetypes.add_type(mime, ext)
+
+
+register_mime_types()
 
 
 #: Read size for hashing and copying media. 8 KiB made a multi-GB video

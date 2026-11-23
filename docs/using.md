@@ -114,8 +114,10 @@ The upload page (`/upload`) takes several files at once, dropped onto the
 page or picked from a dialog. Each file shows a preview, and gets its own
 tags (with suggestions) and its own **private** checkbox.
 
-- Accepted types are JPG, PNG, WebP, GIF, MP4, WebM, AVI, MOV and MKV, up
-  to 10 GiB per upload. AVI, MOV and MKV may not play in every browser.
+- Accepted types are JPG, PNG, WebP, GIF, MP4, M4V, WebM, AVI, MOV and
+  MKV, up to 10 GiB per upload. AVI, MOV and MKV may not play in every
+  browser. M4V plays like MP4, except copy-protected iTunes Store
+  purchases, which play only in Apple's own apps.
 - Files are identified by their content. Uploading a file that is already
   in the index is reported as a duplicate and skipped.
 - A progress bar shows how much has been sent, then *Processing…* while
