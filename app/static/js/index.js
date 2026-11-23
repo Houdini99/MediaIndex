@@ -118,6 +118,7 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
             el.src = d.filepath;          // already the /media/<name> URL
             if (isVideo) {
                 el.controls = true;
+                el.loop = true;   // the slideshow turns it off while it runs
             } else {
                 el.alt = '';
                 // Click-to-zoom, dispatched by common.js. Images and GIFs
@@ -459,6 +460,8 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         const v = modal.querySelector('video');
         if (v) {
             // Let videos play through instead of cutting them off mid-play.
+            // A looping video never fires `ended`, so it plays once here.
+            v.loop = false;
             v.onended = () => { if (slideshowOn) modalNav(1); };
             v.muted = true;   // autoplay is blocked for unmuted video
             v.play().catch(() => {
@@ -497,6 +500,8 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         clearTimeout(slideshowTimer);
         slideshowTimer = null;
         setSlideshowButton(false);
+        const v = document.querySelector('#modal-bg video');
+        if (v) v.loop = true;
     }
 
     function modalDelete() {

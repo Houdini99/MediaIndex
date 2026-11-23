@@ -57,8 +57,9 @@ the last comma.
 
 **Each card** shows the type, and a *private* badge on your private items.
 You can edit its tags in place or delete it. Click it to open the full-size
-view, which plays videos, downloads the file under its original name, runs
-a slideshow, and lets you edit the tags or delete the item if it is yours.
+view, which plays videos on a loop, downloads the file under its original
+name, runs a slideshow, and lets you edit the tags or delete the item if it
+is yours. During a slideshow a video plays once, then the next item opens.
 `←` and `→` move to the neighbouring items, and `Escape` or the browser's
 Back closes it. Edits and deletions show at once, without reloading the
 page.

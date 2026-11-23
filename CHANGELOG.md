@@ -19,6 +19,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   they would otherwise go out as `application/octet-stream`. A link that
   names no file and answers `video/x-m4v` is ingested as `.m4v`.
 
+### Changed
+
+- Videos in the gallery's full-size view play on a loop, as they already
+  did in the feed. A slideshow still plays each video once before it moves
+  on, and stopping the slideshow turns the loop back on.
+
 ## [1.3.0] — 2026-11-21
 
 The web app works properly on a phone now. Page links sit in a tab bar
