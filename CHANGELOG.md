@@ -6,6 +6,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-11-23
+
+The gallery's toolbar stays at the bottom of the screen, so search,
+filters and Select are in reach however far you scroll. Videos in the
+gallery's full-size view play on a loop. `.m4v` videos are accepted
+everywhere and play like MP4.
+
 ### Upgrading from 1.3.0
 
 - Rebuild the web app and both bot images with `./build.sh`. The database
@@ -398,7 +405,8 @@ a network folder, Discord and Telegram.
 
 See [Security model](docs/security.md#known-limitations) for details.
 
-[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Houdini99/MediaIndex/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Houdini99/MediaIndex/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Houdini99/MediaIndex/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Houdini99/MediaIndex/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Houdini99/MediaIndex/compare/v1.0.0...v1.1.0
