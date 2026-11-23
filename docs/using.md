@@ -25,8 +25,9 @@ On a phone the pages are a tab bar along the bottom of the screen, and
 your avatar in the top right opens Settings, Admin and Sign Out. The rest
 of this page works the same way, with these differences:
 
-- The gallery's filters fold away under **Filters** next to the search
-  box; a number on the button says how many are set.
+- The gallery's toolbar sits just above the tab bar. Its filters fold
+  away under **Filters** next to the search box and open upward; a number
+  on the button says how many are set, and a tap outside folds them again.
 - Edit tags and delete from the full-size view; the cards don't carry the
   buttons. Swipe sideways in the full-size view for the next or previous
   item, and swipe down (or use Back) to close it.
@@ -37,6 +38,8 @@ of this page works the same way, with these differences:
 ## Gallery
 
 The gallery (`/`) is a grid of thumbnails that loads more as you scroll.
+Its toolbar is docked to the bottom of the screen, so search, the filters
+and **Select** stay in reach however far you scroll.
 
 **Filters** in the toolbar:
 

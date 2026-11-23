@@ -1,14 +1,27 @@
 /* ── TOOLBAR ─────────────────────────────────────────────────────────── */
+    /* Docked to the bottom of the screen, so search and filters stay in
+       reach however far the grid has scrolled. It lines up with the page's
+       content column (.container: 1480px wide, 1.5rem gutters). index.js
+       publishes its height as --gallery-toolbar-h, the space the grid and
+       the bulk bar leave it; this is the one-row value until then. */
+    :root { --gallery-toolbar-h: 70px; }
     .toolbar {
         display: flex;
         gap: .5rem;
         flex-wrap: wrap;
         align-items: center;
-        margin-bottom: 1.75rem;
+        position: fixed;
+        bottom: 1rem;
+        left: max(1.5rem, var(--safe-left), calc((100% - 1480px) / 2 + 1.5rem));
+        right: max(1.5rem, var(--safe-right), calc((100% - 1480px) / 2 + 1.5rem));
+        /* Above the bulk bar, which its upward tag suggestions overlap;
+           below the modal (200). */
+        z-index: 155;
         padding: .75rem 1rem;
         background: var(--surface);
-        border: 1px solid var(--border);
+        border: 1px solid var(--border2);
         border-radius: var(--r);
+        box-shadow: 0 12px 32px rgba(0,0,0,.55);
     }
 
     /* Layout-free on a wide screen: their children are the toolbar's flex
@@ -158,7 +171,7 @@
     .bulk-bar {
         display: none;
         position: fixed;
-        bottom: 1rem;
+        bottom: calc(var(--gallery-toolbar-h) + 1.5rem);   /* stacked on the toolbar */
         left: 50%;
         transform: translateX(-50%);
         z-index: 150; /* above cards, below the modal (200) */
@@ -179,8 +192,8 @@
         from { opacity: 0; transform: translate(-50%, 8px); }
         to   { opacity: 1; transform: translate(-50%, 0); }
     }
-    /* Keep the last gallery row reachable behind the floating bar */
-    body.select-mode .gallery { padding-bottom: 4.5rem; }
+    /* Keep the last gallery row reachable behind the floating bars */
+    body.select-mode .gallery { padding-bottom: calc(var(--gallery-toolbar-h) + 5.5rem); }
     /* With the tag editor open the bar needs a real width for the
        flex-basis:100% editor row to wrap against (width: max-content
        would otherwise balloon to the viewport cap). */
@@ -270,6 +283,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
         gap: 1rem;
+        padding-bottom: calc(var(--gallery-toolbar-h) + 1rem);   /* clear the docked toolbar */
     }
 
     .gallery-item {
@@ -728,14 +742,25 @@
     }
     /* ── PHONE ───────────────────────────────────────────────────────────── */
     @media (max-width: 760px) {
-        /* Toolbar: search, Filters and Select on one row; the rest folds
-           away under Filters (index.js toggles .filters-open). */
+        /* Toolbar: search, Filters and Select on one row, docked over the
+           tab bar; the rest folds away under Filters (index.js toggles
+           .filters-open) and opens upward, above that row. */
+        :root { --gallery-toolbar-h: 63px; }
         .toolbar {
-            display: block;
-            padding: .55rem;
-            margin-bottom: 1rem;
-            border-radius: 14px;
+            flex-direction: column-reverse;
+            flex-wrap: nowrap;
+            align-items: stretch;
+            gap: 0;
+            left: 0; right: 0;
+            bottom: var(--tabbar-h);
+            padding: .55rem max(.55rem, var(--safe-right)) .55rem max(.55rem, var(--safe-left));
+            border-radius: 14px 14px 0 0;
+            border-left: none; border-right: none; border-bottom: none;
+            box-shadow: 0 -10px 28px rgba(0,0,0,.45);
         }
+        /* The bulk bar sits on top of it in select mode: no corners
+           showing the grid between the two. */
+        body.select-mode .toolbar { border-radius: 0; }
         .toolbar-main {
             display: flex;
             gap: .4rem;
@@ -768,9 +793,9 @@
             display: none;
             grid-template-columns: 1fr 1fr;
             gap: .5rem;
-            padding-top: .55rem;
-            margin-top: .55rem;
-            border-top: 1px solid var(--border);
+            padding-bottom: .55rem;
+            margin-bottom: .55rem;
+            border-bottom: 1px solid var(--border);
         }
         .toolbar.filters-open .toolbar-filters { display: grid; }
         .toolbar.filters-open .toolbar-filter-btn {
@@ -799,6 +824,7 @@
         .gallery {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: .55rem;
+            padding-bottom: var(--gallery-toolbar-h);   /* .container clears the tab bar */
         }
         .gallery-item { border-radius: 10px; }
         .action-buttons,
@@ -835,11 +861,11 @@
         }
         body.select-mode .type-badge.private { left: 2.6rem; }
 
-        /* Bulk bar: docked over the tab bar, one row — the count, then
+        /* Bulk bar: docked over the toolbar, one row — the count, then
            the actions in a strip that scrolls sideways. */
         .bulk-bar {
             left: 0; right: 0;
-            bottom: var(--tabbar-h);
+            bottom: calc(var(--tabbar-h) + var(--gallery-toolbar-h));
             transform: none;
             width: auto;
             max-width: none;
@@ -873,7 +899,7 @@
         .bulk-tag-wrap { min-width: 0; }
         .bulk-tag-editor input { height: 44px; }
         .bulk-tag-editor .btn { height: 44px; }
-        body.select-mode .gallery { padding-bottom: 7rem; }
+        body.select-mode .gallery { padding-bottom: calc(var(--gallery-toolbar-h) + 7rem); }
 
         /* Lightbox: the whole screen, black behind the picture, controls
            as icons, clear of the notch and the home indicator. */

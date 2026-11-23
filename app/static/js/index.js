@@ -745,6 +745,36 @@ const NO_TAGS = '<span class="no-tags">No tags</span>';
         el.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
+    // The toolbar is docked to the bottom of the screen (index.css). Its
+    // height — one row or several, the phone's filters open or folded — is
+    // the room the grid and the bulk bar leave it.
+    document.addEventListener('DOMContentLoaded', () => {
+        const bar = document.getElementById('galleryToolbar');
+        if (!bar) return;
+        const root = document.documentElement.style;
+        new ResizeObserver(() => {
+            root.setProperty('--gallery-toolbar-h', bar.offsetHeight + 'px');
+        }).observe(bar);
+        // Open, the phone's filters lie over the grid: a tap anywhere else
+        // folds them. pointerdown, not click — a tag suggestion is taken
+        // on mousedown and gone from the page by the time a click lands.
+        // A tap on the grid only folds them; it doesn't also open the card
+        // under the finger. The tab bar and the top bar still work at once.
+        let swallowClickUntil = 0;
+        document.addEventListener('pointerdown', e => {
+            if (!bar.classList.contains('filters-open') || bar.contains(e.target)) return;
+            bar.classList.remove('filters-open');
+            bar.querySelector('[data-action="toggle-filters"]').setAttribute('aria-expanded', 'false');
+            if (e.target.closest('.gallery')) swallowClickUntil = e.timeStamp + 600;
+        });
+        document.addEventListener('click', e => {
+            if (e.timeStamp > swallowClickUntil) return;
+            swallowClickUntil = 0;
+            e.preventDefault();
+            e.stopPropagation();
+        }, true);
+    });
+
     // Backdrop click closes the lightbox. The target check is what the
     // old markup achieved with a stopPropagation() handler on .modal-box:
     // only a click on the backdrop itself counts, not one that bubbled up

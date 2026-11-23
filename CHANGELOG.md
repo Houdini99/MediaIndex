@@ -21,6 +21,11 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The gallery's toolbar (search, filters, Select) is docked to the bottom
+  of the screen instead of scrolling away with the top of the page. In
+  select mode the selection bar sits on top of it. On a phone it sits
+  above the tab bar, the folded filters open upward, and a tap outside
+  folds them again.
 - Videos in the gallery's full-size view play on a loop, as they already
   did in the feed. A slideshow still plays each video once before it moves
   on, and stopping the slideshow turns the loop back on.
